@@ -424,6 +424,14 @@ module Yamatanooroti::WindowsTestCaseModule
     sleep @wait
   end
 
+  private def setup_cp(cp)
+    @codepage_success_p = attach_terminal { system("chcp #{Integer(cp)} > NUL") }
+  end
+
+  private def codepage_success?
+    @codepage_success_p
+  end
+
   private def error_message(r, method_name)
     return if not r.zero?
     err = Fiddle.win32_last_error
@@ -569,14 +577,16 @@ module Yamatanooroti::WindowsTestCaseModule
     @result || retrieve_screen
   end
 
-  def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil)
+  def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil, codepage: nil)
     @timeout = timeout
     @wait = wait
     @result = nil
+    @codepage_success_p
 
     @height = height
     @width = width
     setup_console(height, width)
+    setup_cp(codepage) if codepage
     launch(command.map{ |c| quote_command_arg(c) }.join(' '))
 
     case startup_message
