@@ -5,7 +5,7 @@ require 'fiddle/types'
 
 module Yamatanooroti::WindowsDefinition
   extend Fiddle::Importer
-  dlload 'kernel32.dll', 'psapi.dll', 'user32.dll'
+  dlload 'kernel32.dll', 'user32.dll'
   include Fiddle::Win32Types
 
   FREE = Fiddle::Function.new(Fiddle::RUBY_FREE, [Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
@@ -128,26 +128,6 @@ module Yamatanooroti::WindowsDefinition
     'DWORD dwControlKeyState'
   ]
 
-  CHAR_INFO = struct [
-    'WCHAR UnicodeChar',
-    'WORD Attributes'
-  ]
-  typealias 'PCHAR_INFO', 'CHAR_INFO*'
-
-  PROCESSENTRY32W = struct [
-    'DWORD dwSize',
-    'DWORD cntUsage',
-    'DWORD th32ProcessID',
-    'ULONG_PTR th32DefaultHeapID',
-    'DWORD th32ModuleID',
-    'DWORD cntThreads',
-    'DWORD th32ParentProcessID',
-    'LONG pcPriClassBase',
-    'DWORD dwFlags',
-    'WCHAR szExeFile[260]'
-  ]
-  typealias 'LPPROCESSENTRY32W', 'PROCESSENTRY32W*'
-
   STARTF_USESHOWWINDOW = 1
   CREATE_NEW_CONSOLE = 0x10
   CREATE_NEW_PROCESS_GROUP = 0x200
@@ -155,8 +135,6 @@ module Yamatanooroti::WindowsDefinition
   CREATE_NO_WINDOW = 0x08000000
   ATTACH_PARENT_PROCESS = -1
   KEY_EVENT = 0x0001
-  TH32CS_SNAPPROCESS = 0x00000002
-  PROCESS_ALL_ACCESS = 0x001FFFFF
   SW_HIDE = 0
   SW_SHOWNOACTIVE = 4
   LEFT_ALT_PRESSED = 0x0002
@@ -197,20 +175,6 @@ module Yamatanooroti::WindowsDefinition
 
   # BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);
   extern 'BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);', :stdcall
-  # HANDLE CreateToolhelp32Snapshot(DWORD dwFlags, DWORD th32ProcessID);
-  extern 'HANDLE CreateToolhelp32Snapshot(DWORD, DWORD);', :stdcall
-  # BOOL Process32First(HANDLE hSnapshot, LPPROCESSENTRY32W lppe);
-  extern 'BOOL Process32FirstW(HANDLE, LPPROCESSENTRY32W);', :stdcall
-  # BOOL Process32Next(HANDLE hSnapshot, LPPROCESSENTRY32 lppe);
-  extern 'BOOL Process32NextW(HANDLE, LPPROCESSENTRY32W);', :stdcall
-  # DWORD GetCurrentProcessId();
-  extern 'DWORD GetCurrentProcessId();', :stdcall
-  # HANDLE OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId);
-  extern 'HANDLE OpenProcess(DWORD, BOOL, DWORD);', :stdcall
-  # BOOL TerminateProcess(HANDLE hProcess, UINT uExitCode);
-  extern 'BOOL TerminateProcess(HANDLE, UINT);', :stdcall
-  #BOOL TerminateThread(HANDLE hThread, DWORD dwExitCode);
-  extern 'BOOL TerminateThread(HANDLE, DWORD);', :stdcall
 
   # int MultiByteToWideChar(UINT CodePage, DWORD dwFlags, LPCSTR lpMultiByteStr, int cbMultiByte, LPWSTR lpWideCharStr, int cchWideChar);
   extern 'int MultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int);', :stdcall
@@ -445,8 +409,13 @@ module Yamatanooroti::WindowsTestCaseModule
       @status = nil
       @q = Thread::Queue.new
       @t = Thread.new do
-        err = @errin.gets
-        @q << err if err
+        begin
+          err = @errin.gets
+          @q << err if err
+        rescue IOError
+          # target process already terminated
+          next
+        end
       end
     end
 
@@ -572,42 +541,12 @@ module Yamatanooroti::WindowsTestCaseModule
   end
 
   private def free_resources
-    h_snap = DL.CreateToolhelp32Snapshot(DL::TH32CS_SNAPPROCESS, 0)
-    pe = DL::PROCESSENTRY32W.malloc
-    (pe.to_ptr + 0)[0, DL::PROCESSENTRY32W.size] = "\x00" * DL::PROCESSENTRY32W.size
-    pe.dwSize = DL::PROCESSENTRY32W.size
-    r = DL.Process32FirstW(h_snap, pe)
-    error_message(r, "Process32First")
-    process_table = {}
-    loop do
-      #log "a #{pe.th32ParentProcessID.inspect} -> #{pe.th32ProcessID.inspect} #{wc2mb(pe.szExeFile.pack('S260')).unpack('Z*').pack('Z*')}"
-      process_table[pe.th32ParentProcessID] ||= []
-      process_table[pe.th32ParentProcessID] << pe.th32ProcessID
-      break if DL.Process32NextW(h_snap, pe).zero?
-    end
-    process_table[DL.GetCurrentProcessId].each do |child_pid|
-      kill_process_tree(process_table, child_pid)
-    end
-    #r = DL.TerminateThread(@pi.hThread, 0)
-    #error_message(r, "TerminateThread")
-    #sleep @wait
-    #r = DL.FreeConsole()
-    #error_message(r, "FreeConsole")
-    #r = DL.AttachConsole(DL::ATTACH_PARENT_PROCESS)
-    #error_message(r, 'AttachConsole')
-  end
-
-  private def kill_process_tree(process_table, pid)
-    process_table[pid]&.each do |child_pid|
-      kill_process_tree(process_table, child_pid)
-    end
-    h_proc = DL.OpenProcess(DL::PROCESS_ALL_ACCESS, 0, pid)
-    if (h_proc)
-      r = DL.TerminateProcess(h_proc, 0)
-      # error_message(r, "TerminateProcess")
-      r = DL.CloseHandle(h_proc)
-      error_message(r, "CloseHandle")
-    end
+    system("taskkill.exe", "/PID", "#{@pid}", {[:out, :err] => "NUL"})
+    system("taskkill.exe", "/PID", "#{@console_process_info.dwProcessId}", {[:out, :err] => "NUL"})
+    r = DL.CloseHandle(@console_process_info.hProcess)
+    error_message(r, "CloseHandle(hProcess)")
+    r = DL.CloseHandle(@console_process_info.hThread)
+    error_message(r, "CloseHandle(hThread)")
   end
 
   def close
@@ -694,6 +633,7 @@ module Yamatanooroti::WindowsTestCaseModule
       convert_proc.call(@result)
     else
       loop do
+        @target.sync
         screen = convert_proc.call(retrieve_screen)
         break screen if Time.now >= retry_until
         break screen if check_proc.call(screen)
