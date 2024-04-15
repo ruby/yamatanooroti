@@ -57,13 +57,26 @@ module Yamatanooroti::WindowsDefinition
   typealias 'PSMALL_RECT', 'SMALL_RECT*'
 
   CONSOLE_SCREEN_BUFFER_INFO = struct [
-    'COORD dwSize',
-    'COORD dwCursorPosition',
+    'SHORT dwSize_X', 'SHORT dwSize_Y', # 'COORD dwSize',
+    'SHORT dwCursorPosition_X', 'SHORT dwCursorPosition_Y', #'COORD dwCursorPosition',
     'WORD wAttributes',
     'SHORT Left', 'SHORT Top', 'SHORT Right', 'SHORT Bottom', # 'SMALL_RECT srWindow',
     'SHORT MaxWidth', 'SHORT MaxHeight' # 'COORD dwMaximumWindowSize'
   ]
   typealias 'PCONSOLE_SCREEN_BUFFER_INFO', 'CONSOLE_SCREEN_BUFFER_INFO*'
+
+  typealias 'COLORREF', 'DWORD'
+  CONSOLE_SCREEN_BUFFER_INFOEX = struct [
+    'ULONG cbSize',
+    'SHORT dwSize_X', 'SHORT dwSize_Y', # 'COORD dwSize',
+    'SHORT dwCursorPosition_X', 'SHORT dwCursorPosition_Y', #'COORD dwCursorPosition',
+    'WORD wAttributes',
+    'SHORT Left', 'SHORT Top', 'SHORT Right', 'SHORT Bottom', # 'SMALL_RECT srWindow',
+    'SHORT MaxWidth', 'SHORT MaxHeight', # 'COORD dwMaximumWindowSize',
+    'BOOL bFullScreenSupported',
+    'COLORREF ColorTable[16]'
+  ]
+  typealias 'PCONSOLE_SCREEN_BUFFER_INFOEX', 'CONSOLE_SCREEN_BUFFER_INFOEX*'
 
   SECURITY_ATTRIBUTES = struct [
     'DWORD nLength',
@@ -135,19 +148,6 @@ module Yamatanooroti::WindowsDefinition
   ]
   typealias 'LPPROCESSENTRY32W', 'PROCESSENTRY32W*'
 
-  CONSOLE_FONT_INFOEX = struct [
-    'ULONG cbSize',
-    'DWORD nFont',
-    'DWORD32 dwFontSize',
-    'UINT FontFamily',
-    'UINT FontWeight',
-    'WCHAR FaceName[32]'
-  ]
-  typealias 'PCONSOLE_FONT_INFOEX', 'CONSOLE_FONT_INFOEX*'
-
-  STD_INPUT_HANDLE = -10
-  STD_OUTPUT_HANDLE = -11
-  STD_ERROR_HANDLE = -12
   STARTF_USESHOWWINDOW = 1
   CREATE_NEW_CONSOLE = 0x10
   CREATE_NEW_PROCESS_GROUP = 0x200
@@ -158,6 +158,7 @@ module Yamatanooroti::WindowsDefinition
   TH32CS_SNAPPROCESS = 0x00000002
   PROCESS_ALL_ACCESS = 0x001FFFFF
   SW_HIDE = 0
+  SW_SHOWNOACTIVE = 4
   LEFT_ALT_PRESSED = 0x0002
 
   # HANDLE GetStdHandle(DWORD nStdHandle);
@@ -175,8 +176,6 @@ module Yamatanooroti::WindowsDefinition
   extern 'BOOL ShowWindow(HWND hWnd,int nCmdShow);', :stdcall
   # HWND WINAPI GetConsoleWindow(void);
   extern 'HWND GetConsoleWindow(void);', :stdcall
-  # BOOL WINAPI SetConsoleScreenBufferSize(HANDLE hConsoleOutput, COORD dwSize);
-  extern 'BOOL SetConsoleScreenBufferSize(HANDLE, COORD);', :stdcall
   # BOOL WINAPI SetConsoleWindowInfo(HANDLE hConsoleOutput, BOOL bAbsolute, const SMALL_RECT *lpConsoleWindow);
   extern 'BOOL SetConsoleWindowInfo(HANDLE, BOOL, PSMALL_RECT);', :stdcall
   # BOOL WriteConsoleInputW(HANDLE hConsoleInput, const INPUT_RECORD *lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsWritten);
@@ -191,10 +190,10 @@ module Yamatanooroti::WindowsDefinition
   extern 'BOOL ReadConsoleOutputCharacterW(HANDLE, LPWSTR, DWORD, COORD, LPDWORD);', :stdcall
   # BOOL WINAPI GetConsoleScreenBufferInfo(HANDLE hConsoleOutput, PCONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
   extern 'BOOL GetConsoleScreenBufferInfo(HANDLE, PCONSOLE_SCREEN_BUFFER_INFO);', :stdcall
-  # BOOL WINAPI GetCurrentConsoleFontEx(HANDLE hConsoleOutput, BOOL bMaximumWindow, PCONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);
-  extern 'BOOL GetCurrentConsoleFontEx(HANDLE, BOOL, PCONSOLE_FONT_INFOEX);', :stdcall
-  # BOOL WINAPI SetCurrentConsoleFontEx(HANDLE hConsoleOutput, BOOL bMaximumWindow, PCONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);
-  extern 'BOOL SetCurrentConsoleFontEx(HANDLE, BOOL, PCONSOLE_FONT_INFOEX);', :stdcall
+  # BOOL WINAPI GetConsoleScreenBufferInfoEx(HANDLE hConsoleOutput, PCONSOLE_SCREEN_BUFFER_INFOEX lpConsoleScreenBufferInfoEx);
+  extern 'BOOL GetConsoleScreenBufferInfoEx(HANDLE, PCONSOLE_SCREEN_BUFFER_INFOEX);', :stdcall
+  # BOOL WINAPI SetConsoleScreenBufferInfoEx(HANDLE hConsoleOutput, PCONSOLE_SCREEN_BUFFER_INFOEX lpConsoleScreenBufferInfoEx);
+  extern 'BOOL SetConsoleScreenBufferInfoEx(HANDLE, PCONSOLE_SCREEN_BUFFER_INFOEX);', :stdcall
 
   # BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);
   extern 'BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);', :stdcall
@@ -233,12 +232,72 @@ module Yamatanooroti::WindowsDefinition
   extern 'HLOCAL LocalFree(HLOCAL hMem);', :stdcall
   FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
   FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
-  LANG_NEUTRAL = 0x00
-  SUBLANG_DEFAULT = 0x01
 
-  extern 'int GetSystemMetrics(int);', :stdcall
-  SM_CXMIN = 28
-  SM_CYMIN = 29
+  private def error_message(err, method_name)
+    string = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
+    FormatMessage(
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+      Fiddle::NULL,
+      err,
+      0x0,
+      string,
+      0,
+      Fiddle::NULL
+    )
+    str = string.ptr.to_s
+    LocalFree(string)
+    str.force_encoding("Windows-31J")
+    puts "ERROR(#{method_name}): #{err.to_s}: #{string.ptr.to_s.force_encoding("locale")}"
+  end
+
+  def get_console_screen_buffer_info(handle)
+    csbi = CONSOLE_SCREEN_BUFFER_INFO.malloc
+    r = GetConsoleScreenBufferInfo(handle, csbi)
+    puts error_message(r, 'GetConsoleScreenBufferInfo') if r == 0
+    r == 0 ? nil : csbi
+  end
+
+  def set_console_screen_buffer_info_ex(handle, h, w, buffer_height)
+    csbi = CONSOLE_SCREEN_BUFFER_INFOEX.malloc
+    csbi.cbSize = CONSOLE_SCREEN_BUFFER_INFOEX.size
+    r = GetConsoleScreenBufferInfoEx(handle, csbi)
+    error_message(r, 'GetConsoleScreenBufferSize') if r == 0
+    csbi.dwSize_X = w
+    csbi.dwSize_Y = buffer_height
+    csbi.Left = 0
+    csbi.Right = w - 1
+    csbi.Top = [csbi.Top, buffer_height - h].min
+    csbi.Bottom = csbi.Top + h - 1
+    r = SetConsoleScreenBufferInfoEx(handle, csbi)
+    puts error_message(r, 'SetConsoleScreenBufferInfoEx') if r == 0
+    return r != 0
+  end
+
+  def set_console_window_info(handle, h, w)
+    rect = SMALL_RECT.malloc
+    rect.Left = 0
+    rect.Top = 0
+    rect.Right = w - 1
+    rect.Bottom = h - 1
+    r = SetConsoleWindowInfo(handle, 1, rect)
+    puts error_message(r, 'SetConsoleWindowInfo') if r == 0
+    return r != 0
+  end
+
+  def set_console_window_size(handle, h, w)
+    # expand buffer size to keep scrolled away lines
+    buffer_h = h + 100
+
+    r = set_console_screen_buffer_info_ex(handle, h, w, buffer_h)
+    return false unless r
+
+    r = set_console_window_info(handle, h, w)
+    return false unless r
+
+    return true
+  end
+
+  extend self
 end
 
 module Yamatanooroti::WindowsTestCaseModule
@@ -305,7 +364,10 @@ module Yamatanooroti::WindowsTestCaseModule
     startup_info = DL::STARTUPINFOW.malloc
     (startup_info.to_ptr + 0)[0, DL::STARTUPINFOW.size] = "\x00".b * DL::STARTUPINFOW.size
     startup_info.cb = DL::STARTUPINFOW.size
-    if not ENV['YAMATANOOROTI_SHOW_WINDOW']
+    if ENV['YAMATANOOROTI_SHOW_WINDOW']
+      startup_info.dwFlags = DL::STARTF_USESHOWWINDOW
+      startup_info.wShowWindow = DL::SW_SHOWNOACTIVE
+    else
       startup_info.dwFlags = DL::STARTF_USESHOWWINDOW
       startup_info.wShowWindow = DL::SW_HIDE
     end
@@ -327,58 +389,8 @@ module Yamatanooroti::WindowsTestCaseModule
     end
 
     attach_terminal do |conin, conout|
-      change_console_size(conout, height, width)
+      DL.set_console_window_size(conout, height, width)
     end
-  end
-
-  def change_console_size(handle, height, width)
-    font = DL::CONSOLE_FONT_INFOEX.malloc
-    font.cbSize = DL::CONSOLE_FONT_INFOEX.size
-
-    r = DL.GetCurrentConsoleFontEx(handle, 0, font)
-    error_message(r, 'GetCurrentConsoleFontEx')
-    fontsize = (font.dwFontSize & 0xffff0000) / 65536
-    fontwidth = font.dwFontSize & 0xffff
-    newsize = fontsize
-    newwidth = fontwidth
-
-    csbi = DL::CONSOLE_SCREEN_BUFFER_INFO.malloc
-    r = DL.GetConsoleScreenBufferInfo(handle, csbi)
-    error_message(r, 'GetConsoleScreenBufferInfo')
-
-    if (width < (csbi.Right - csbi.Left + 1) / 4)
-      newsize = fontsize * (csbi.Right - csbi.Left + 1) / width
-      newwidth = fontwidth * (csbi.Right - csbi.Left + 1) / width
-    end
-    if newsize * height > fontsize * csbi.MaxHeight
-      newsize = fontsize * csbi.MaxHeight / height
-      newwidth = fontwidth * newsize / fontsize
-    end
-
-    font.dwFontSize = newsize * 65536 + newwidth
-    r = DL.SetCurrentConsoleFontEx(handle, 0, font)
-    error_message(r, 'SetCurrentConsoleFontEx')
-
-    rect = DL::SMALL_RECT.malloc
-    rect.Left = 0
-    rect.Top = 0
-    rect.Right = width - 1
-    rect.Bottom = height - 1
-    r = DL.SetConsoleWindowInfo(handle, 1, rect)
-    error_message(r, 'SetConsoleWindowInfo')
-
-    csbi = DL::CONSOLE_SCREEN_BUFFER_INFO.malloc
-    r = DL.GetConsoleScreenBufferInfo(handle, csbi)
-    error_message(r, 'GetConsoleScreenBufferInfo')
-
-    size = height * 65536 + width
-    r = DL.SetConsoleScreenBufferSize(handle, size)
-    error_message(r, "SetConsoleScreenBufferSize " \
-      "(#{height} #{width}) " \
-      "(#{csbi.Bottom - csbi.Top + 1} #{csbi.Right - csbi.Left + 1}) " \
-      "(#{csbi.dwSize / 65536} #{csbi.dwSize & 65535}) " \
-      "(#{csbi.Top} #{csbi.Left}) " \
-      "(#{csbi.Bottom} #{csbi.Right})")
   end
 
   private def mb2wc(str)
@@ -609,12 +621,21 @@ module Yamatanooroti::WindowsTestCaseModule
     @target.ensure_close
   end
 
-  private def retrieve_screen
+  private def retrieve_screen(top_of_buffer: false)
+    top, bottom = attach_terminal do |conin, conout|
+      csbi = DL.get_console_screen_buffer_info(conout)
+      if top_of_buffer
+        [0, csbi.Bottom]
+      else
+        [csbi.Top, csbi.Bottom]
+      end
+    end
+
     buffer_chars = @width * 8
     buffer = Fiddle::Pointer.malloc(Fiddle::SIZEOF_SHORT * buffer_chars, DL::FREE)
     n = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, DL::FREE)
     lines = attach_terminal do |conin, conout|
-      (0...@height).map do |y|
+      (top..bottom).map do |y|
         r = DL.ReadConsoleOutputCharacterW(conout, buffer, @width, y << 16, n)
         error_message(r, "ReadConsoleOutputCharacterW")
         if r != 0
