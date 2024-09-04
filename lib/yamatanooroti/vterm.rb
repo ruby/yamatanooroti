@@ -4,7 +4,8 @@ require 'pty'
 require 'io/console'
 
 module Yamatanooroti::VTermTestCaseModule
-  def start_terminal(height, width, command, wait: 0.1, startup_message: nil)
+  def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil)
+    @timeout = timeout
     @wait = wait
     @result = nil
 
@@ -18,14 +19,10 @@ module Yamatanooroti::VTermTestCaseModule
 
     case startup_message
     when String
-      @startup_message = ->(message) { message.start_with?(startup_message) }
+      wait_startup_message { |message| message.start_with?(startup_message) }
     when Regexp
-      @startup_message = ->(message) { startup_message.match?(message) }
-    else
-      @startup_message = nil
+      wait_startup_message { |message| startup_message.match?(message) }
     end
-
-    sync
   end
 
   def write(str)
@@ -42,76 +39,121 @@ module Yamatanooroti::VTermTestCaseModule
       end
     end
     @pty_input.write(str_to_write)
-    sync
+    # Write str (e.g. `exit`) to pty_input might terminate the process.
+    try_sync
   end
 
   def close
-    sync
-    @pty_input.close
-    sync
-    Process.kill('KILL', @pid)
-    Process.waitpid(@pid)
-  end
-
-  private def sync
-    startup_message = +'' if @startup_message
-    loop do
-      sleep @wait
-      chunk = @pty_output.read_nonblock(1024)
-      if @startup_message
-        startup_message << chunk
-        if @startup_message.(startup_message)
-          @startup_message = nil
-          chunk = startup_message
-        else
-          redo
-        end
-      end
-      @vterm.write(chunk)
-      chunk = @vterm.read
-      @pty_input.write(chunk)
-    rescue Errno::EAGAIN, Errno::EWOULDBLOCK
-      retry if @startup_message
-      break
-    rescue Errno::EIO # EOF
-      retry if @startup_message
-      break
-    rescue IO::EAGAINWaitReadable # emtpy buffer
-      retry if @startup_message
-      break
+    begin
+      sync
+      @pty_input.close
+      sync
+    rescue IOError, Errno::EIO
+    end
+    begin
+      Process.kill('KILL', @pid)
+      Process.waitpid(@pid)
+    rescue Errno::ESRCH
     end
   end
 
+  private def wait_startup_message
+    wait_until = Time.now + @timeout
+    chunks = +''
+    loop do
+      wait = wait_until - Time.now
+      if wait.negative? || !@pty_output.wait_readable(wait)
+        raise "Startup message didn't arrive within timeout: #{chunks.inspect}"
+      end
+
+      chunk = @pty_output.read_nonblock(65536)
+      vterm_write(chunk)
+      chunks << chunk
+      break if yield chunks
+    end
+  end
+
+  private def vterm_write(chunk)
+    @vterm.write(chunk)
+    @pty_input.write(@vterm.read)
+    @result = nil
+  end
+
+  private def sync(wait = @wait)
+    sync_until = Time.now + @timeout
+    while @pty_output.wait_readable(wait)
+      vterm_write(@pty_output.read_nonblock(65536))
+      break if Time.now > sync_until
+    end
+  end
+
+  private def try_sync(wait = @wait)
+    sync(wait)
+    true
+  rescue IOError, Errno::EIO
+    false
+  end
+
+
   def result
-    return @result if @result
-    @result = []
+    try_sync(0)
+    @result ||= retrieve_screen
+  end
+
+  private def retrieve_screen
+    result = []
     rows, cols = @vterm.size
     rows.times do |r|
-      @result << +''
+      result << +''
       cols.times do |c|
         cell = @screen.cell_at(r, c)
         if cell.char # The second cell of fullwidth char will be nil.
           if cell.char.empty?
             # There will be no char to the left of the rendered area if moves
             # the cursor.
-            @result.last << ' '
+            result.last << ' '
           else
-            @result.last << cell.char
+            result.last << cell.char
           end
         end
       end
-      @result.last.gsub!(/ *$/, '')
+      result.last.gsub!(/ *$/, '')
     end
-    @result
+    result
+  end
+
+  private def assert_screen_with_proc(check_proc, assert_block, convert_proc = :itself.to_proc)
+    retry_until = Time.now + @timeout
+    while Time.now < retry_until
+      break unless try_sync
+
+      @result ||= retrieve_screen
+      break if check_proc.call(convert_proc.call(@result))
+    end
+    @result ||= retrieve_screen
+    assert_block.call(convert_proc.call(@result))
   end
 
   def assert_screen(expected_lines, message = nil)
-    actual_lines = result
+    lines_to_string = ->(lines) { lines.join("\n").sub(/\n*\z/, "\n") }
     case expected_lines
     when Array
-      assert_equal(expected_lines, actual_lines, message)
+      assert_screen_with_proc(
+        ->(a) { expected_lines == a },
+        ->(a) { assert_equal(expected_lines, a, message) }
+      )
     when String
-      assert_equal(expected_lines, actual_lines.join("\n").sub(/\n*\z/, "\n"), message)
+      assert_screen_with_proc(
+        ->(a) { expected_lines == a },
+        ->(a) { assert_equal(expected_lines, a, message) },
+        lines_to_string
+      )
+    when Regexp
+      assert_screen_with_proc(
+        ->(a) { expected_lines.match?(a) },
+        ->(a) { assert_match(expected_lines, a, message) },
+        lines_to_string
+      )
     end
   end
 end

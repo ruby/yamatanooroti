@@ -516,15 +516,19 @@ module Yamatanooroti::WindowsTestCaseModule
   end
 
   def result
-    @result
+    @result || retrieve_screen
   end
 
   def assert_screen(expected_lines, message = nil)
+    actual_lines = result
+    actual_string = actual_lines.join("\n").sub(/\n*\z/, "\n")
     case expected_lines
     when Array
-      assert_equal(expected_lines, @result, message)
+      assert_equal(expected_lines, actual_lines, message)
     when String
-      assert_equal(expected_lines, @result.join("\n").sub(/\n*\z/, "\n"), message)
+      assert_equal(expected_lines, actual_string, message)
+    when Regexp
+      assert_match(expected_lines, actual_string, message)
     end
   end
 

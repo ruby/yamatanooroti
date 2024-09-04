@@ -26,19 +26,20 @@ class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
 
   def test_move_cursor_and_render
     start_terminal(5, 30, ['ruby', '-rio/console', '-e', 'STDOUT.puts(?A);STDOUT.goto(2,2);STDOUT.puts(?B)'])
+    assert_screen(/^  B/)
     close
     assert_equal(['A', '', '  B', '', ''], result)
   end
 
   def test_meta_key
     get_into_tmpdir
-    start_terminal(5, 30, ['ruby', '-rreline', '-e', 'Reline.readline(%{?})'])
+    start_terminal(5, 30, ['ruby', '-rreline', '-e', 'Reline.readline(%{>>>})'], startup_message: />{3}/)
     write('aaa ccc')
     write("\M-b")
     write('bbb ')
     close
     assert_screen(<<~EOC)
-      ?aaa bbb ccc
+      >>>aaa bbb ccc
     EOC
   ensure
     get_out_from_tmpdir
