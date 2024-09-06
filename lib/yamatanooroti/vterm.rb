@@ -10,7 +10,8 @@ module Yamatanooroti::VTermTestCaseModule
     @wait = wait
     @result = nil
 
-    @pty_output, @pty_input, @pid = PTY.spawn('bash', '-c', %[stty rows #{height.to_s} cols #{width.to_s}; "$@"], '--', *command)
+    @pty_output, @pty_input, @pid = PTY.spawn(*command)
+    @pty_output.winsize = [height, width]
 
     @vterm = VTerm.new(height, width)
     @vterm.set_utf8(true)
