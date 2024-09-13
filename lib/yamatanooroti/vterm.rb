@@ -2,6 +2,7 @@ require 'test/unit'
 require 'vterm'
 require 'pty'
 require 'io/console'
+require 'io/wait'
 
 module Yamatanooroti::VTermTestCaseModule
   def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil)
