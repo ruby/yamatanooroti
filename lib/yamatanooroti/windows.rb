@@ -148,11 +148,6 @@ module Yamatanooroti::WindowsDefinition
   STD_ERROR_HANDLE = -12
   ATTACH_PARENT_PROCESS = -1
   KEY_EVENT = 0x0001
-  CT_CTYPE3 = 0x04
-  C3_HIRAGANA = 0x0020
-  C3_HALFWIDTH = 0x0040
-  C3_FULLWIDTH = 0x0080
-  C3_IDEOGRAPH = 0x0100
   TH32CS_SNAPPROCESS = 0x00000002
   PROCESS_ALL_ACCESS = 0x001FFFFF
   SW_HIDE = 0
@@ -183,8 +178,8 @@ module Yamatanooroti::WindowsDefinition
   extern 'SHORT VkKeyScanW(WCHAR);', :stdcall
   # UINT MapVirtualKeyW(UINT uCode, UINT uMapType);
   extern 'UINT MapVirtualKeyW(UINT, UINT);', :stdcall
-  # BOOL ReadConsoleOutputW(HANDLE hConsoleOutput, PCHAR_INFO lpBuffer, COORD dwBufferSize, COORD dwBufferCoord, PSMALL_RECT lpReadRegion);
-  extern 'BOOL ReadConsoleOutputW(HANDLE, PCHAR_INFO, COORD, COORD, PSMALL_RECT);', :stdcall
+  # BOOL WINAPI ReadConsoleOutputCharacterW(HANDLE hConsoleOutput, LPWSTR lpCharacter, DWORD nLength, COORD dwReadCoord, LPDWORD lpNumberOfCharsRead);
+  extern 'BOOL ReadConsoleOutputCharacterW(HANDLE, LPWSTR, DWORD, COORD, LPDWORD);', :stdcall
   # BOOL WINAPI GetConsoleScreenBufferInfo(HANDLE hConsoleOutput, PCONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
   extern 'BOOL GetConsoleScreenBufferInfo(HANDLE, PCONSOLE_SCREEN_BUFFER_INFO);', :stdcall
   # BOOL WINAPI GetCurrentConsoleFontEx(HANDLE hConsoleOutput, BOOL bMaximumWindow, PCONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);
@@ -213,8 +208,6 @@ module Yamatanooroti::WindowsDefinition
   extern 'int MultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int);', :stdcall
   # int WideCharToMultiByte(UINT CodePage, DWORD dwFlags, _In_NLS_string_(cchWideChar)LPCWCH lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, LPCCH lpDefaultChar, LPBOOL lpUsedDefaultChar);
   extern 'int WideCharToMultiByte(UINT, DWORD, LPCWCH, int, LPSTR, int, LPCCH, LPBOOL);', :stdcall
-  #BOOL GetStringTypeW(DWORD dwInfoType, LPCWCH lpSrcStr, int cchSrc, LPWORD lpCharType);
-  extern 'BOOL GetStringTypeW(DWORD, LPCWCH, int, LPWORD);', :stdcall
 
   typealias 'LPTSTR', 'void*'
   typealias 'HLOCAL', 'HANDLE'
@@ -310,25 +303,6 @@ module Yamatanooroti::WindowsTestCaseModule
     converted_str
   end
 
-  private def full_width?(c)
-    return false if c.nil? or c.empty?
-    wc = mb2wc(c)
-    type = Fiddle::Pointer.malloc(Fiddle::SIZEOF_WORD, DL::FREE)
-    DL.GetStringTypeW(DL::CT_CTYPE3, wc, wc.bytesize, type)
-    char_type = type[0, Fiddle::SIZEOF_WORD].unpack('S').first
-    if char_type.anybits?(DL::C3_FULLWIDTH)
-      true
-    elsif char_type.anybits?(DL::C3_HALFWIDTH)
-      false
-    elsif char_type.anybits?(DL::C3_HIRAGANA)
-      true
-    elsif char_type.anybits?(DL::C3_IDEOGRAPH)
-      true
-    else
-      false
-    end
-  end
-
   private def quote_command_arg(arg)
     if not arg.match?(/[ \t"]/)
       # No quotation needed.
@@ -359,7 +333,7 @@ module Yamatanooroti::WindowsTestCaseModule
   end
 
   private def launch(command)
-    command = %Q{cmd.exe /q /c "#{command}"}
+    command = "#{command}\0"
     converted_command = mb2wc(command)
     @pi = DL::PROCESS_INFORMATION.malloc
     (@pi.to_ptr + 0)[0, DL::PROCESS_INFORMATION.size] = "\x00" * DL::PROCESS_INFORMATION.size
@@ -479,40 +453,23 @@ module Yamatanooroti::WindowsTestCaseModule
   end
 
   def close
-    sleep @wait
+    sleep 0.3
     # read first before kill the console process including output
     @result = retrieve_screen
 
     free_resources
   end
 
-  private def retrieve_screen
-    char_info_matrix = Fiddle::Pointer.to_ptr("\x00" * (DL::CHAR_INFO.size * (@height * @width)))
-    region = DL::SMALL_RECT.malloc
-    region.Left = 0
-    region.Top = 0
-    region.Right = @width - 1
-    region.Bottom = @height - 1
-    r = DL.ReadConsoleOutputW(@output_handle, char_info_matrix, @height * 65536 + @width, 0, region)
-    error_message(r, "ReadConsoleOutputW")
-    screen = []
-    prev_c = nil
-    @height.times do |y|
-      line = +''
-      @width.times do |x|
-        index = @width * y + x
-        char_info = DL::CHAR_INFO.new(char_info_matrix + DL::CHAR_INFO.size * index)
-        mb = [char_info.UnicodeChar].pack('U')
-        if prev_c == mb and full_width?(mb)
-          prev_c = nil
-        else
-          line << mb
-          prev_c = mb
-        end
-      end
-      screen << line.gsub(/ *$/, '')
+  def retrieve_screen
+    buffer_chars = @width * 8
+    buffer = Fiddle::Pointer.malloc(Fiddle::SIZEOF_SHORT * buffer_chars, DL::FREE)
+    n = Fiddle::Pointer[0]
+    lines = (0...@height).map do |y|
+      r = DL.ReadConsoleOutputCharacterW(@output_handle, buffer, @width, y << 16, -n)
+      error_message(r, "ReadConsoleOutputCharacterW")
+      r == 0 ? "" : wc2mb(buffer[0, n.to_i * 2]).gsub(/ *$/, "")
     end
-    screen
+    lines
   end
 
   def result
