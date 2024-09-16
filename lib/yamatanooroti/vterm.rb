@@ -76,7 +76,12 @@ module Yamatanooroti::VTermTestCaseModule
 
   private def vterm_write(chunk)
     @vterm.write(chunk)
-    @pty_input.write(@vterm.read)
+    response = @vterm.read
+    begin
+      @pty_input.write(response)
+    rescue Errno::EIO
+      # In case process terminates suddenly after writing "\e[6n"
+    end
     @result = nil
   end
 
