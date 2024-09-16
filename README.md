@@ -99,11 +99,11 @@ Writes `str` like inputting by a keyboard to the started terminal.
 
 ### `close`
 
-Closes the terminal to take the internal rendering result. You must call it before call assertions.
+Closes the terminal and terminates the process.
 
 ### `assert_screen(expected_lines)`
 
-Asserts the rendering result of the terminal with `expected_lines` that should be an `Array` or a `String` of lines. The `Array` contains blank lines and doesn't contain newline characters, and the `String` contains newline characters at end of each line and doesn't contain continuous last blank lines.
+Asserts the rendering result of the terminal with `expected_lines` that should be an `Array`, `Regexp`, or a `String` of lines. The `Array` contains blank lines and doesn't contain newline characters, and the `String` contains newline characters at end of each line and doesn't contain continuous last blank lines.
 
 ## License
 
