@@ -128,7 +128,7 @@ module Yamatanooroti::VTermTestCaseModule
     result
   end
 
-  private def assert_screen_with_proc(check_proc, assert_block, convert_proc = :itself.to_proc)
+  private def retryable_screen_assertion_with_proc(check_proc, assert_proc, convert_proc = :itself.to_proc)
     retry_until = Time.now + @timeout
     while Time.now < retry_until
       break unless try_sync
@@ -137,27 +137,27 @@ module Yamatanooroti::VTermTestCaseModule
       break if check_proc.call(convert_proc.call(@result))
     end
     @result ||= retrieve_screen
-    assert_block.call(convert_proc.call(@result))
+    assert_proc.call(convert_proc.call(@result))
   end
 
   def assert_screen(expected_lines, message = nil)
     lines_to_string = ->(lines) { lines.join("\n").sub(/\n*\z/, "\n") }
     case expected_lines
     when Array
-      assert_screen_with_proc(
-        ->(a) { expected_lines == a },
-        ->(a) { assert_equal(expected_lines, a, message) }
+      retryable_screen_assertion_with_proc(
+        ->(actual) { expected_lines == actual },
+        ->(actual) { assert_equal(expected_lines, actual, message) }
       )
     when String
-      assert_screen_with_proc(
-        ->(a) { expected_lines == a },
-        ->(a) { assert_equal(expected_lines, a, message) },
+      retryable_screen_assertion_with_proc(
+        ->(actual) { expected_lines == actual },
+        ->(actual) { assert_equal(expected_lines, actual, message) },
         lines_to_string
       )
     when Regexp
-      assert_screen_with_proc(
-        ->(a) { expected_lines.match?(a) },
-        ->(a) { assert_match(expected_lines, a, message) },
+      retryable_screen_assertion_with_proc(
+        ->(actual) { expected_lines.match?(actual) },
+        ->(actual) { assert_match(expected_lines, actual, message) },
         lines_to_string
       )
     end
