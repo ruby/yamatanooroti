@@ -68,7 +68,7 @@ class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
       Dir.mkdir(@tmpdir)
     end
     @inputrc_backup = ENV['INPUTRC']
-    @inputrc_file = ENV['INPUTRC'] = File.join(@tmpdir, 'temporaty_inputrc')
+    @inputrc_file = ENV['INPUTRC'] = File.join(@tmpdir, 'temporary_inputrc')
     File.unlink(@inputrc_file) if File.exist?(@inputrc_file)
   end
 
