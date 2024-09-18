@@ -2,7 +2,7 @@
 
 Yamatanooroti is a multi-platform real(?) terminal testing framework.
 
-Supporting envronments:
+Supporting environments:
 
 - vterm gem
 - Windows command prompt
