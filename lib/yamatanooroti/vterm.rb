@@ -9,6 +9,7 @@ module Yamatanooroti::VTermTestCaseModule
     @timeout = timeout
     @wait = wait
     @result = nil
+    @maybe_read = false
 
     @pty_output, @pty_input, @pid = PTY.spawn(*command)
     @pty_output.winsize = [height, width]
@@ -41,6 +42,7 @@ module Yamatanooroti::VTermTestCaseModule
       end
     end
     @pty_input.write(str_to_write)
+    @maybe_read = true
     # Write str (e.g. `exit`) to pty_input might terminate the process.
     try_sync
   end
@@ -80,6 +82,7 @@ module Yamatanooroti::VTermTestCaseModule
     response = @vterm.read
     begin
       @pty_input.write(response)
+      @maybe_read = true if response != nil && response != ""
     rescue Errno::EIO
       # In case process terminates suddenly after writing "\e[6n"
     end
@@ -89,7 +92,10 @@ module Yamatanooroti::VTermTestCaseModule
   private def sync(wait = @wait)
     sync_until = Time.now + @timeout
     while @pty_output.wait_readable(wait)
-      vterm_write(@pty_output.read_nonblock(65536))
+      @pty_output.wait_readable(sync_until - Time.now) if @maybe_read
+      chunk = @pty_output.read_nonblock(65536)
+      @maybe_read = false
+      vterm_write(chunk)
       break if Time.now > sync_until
     end
   end
