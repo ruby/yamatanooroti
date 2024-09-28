@@ -460,7 +460,7 @@ module Yamatanooroti::WindowsTestCaseModule
     free_resources
   end
 
-  def retrieve_screen
+  private def retrieve_screen
     buffer_chars = @width * 8
     buffer = Fiddle::Pointer.malloc(Fiddle::SIZEOF_SHORT * buffer_chars, DL::FREE)
     n = Fiddle::Pointer[0]
@@ -476,42 +476,68 @@ module Yamatanooroti::WindowsTestCaseModule
     @result || retrieve_screen
   end
 
-  def assert_screen(expected_lines, message = nil)
-    actual_lines = result
-    actual_string = actual_lines.join("\n").sub(/\n*\z/, "\n")
-    case expected_lines
-    when Array
-      assert_equal(expected_lines, actual_lines, message)
+  def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil)
+    @timeout = timeout
+    @wait = wait
+    @result = nil
+
+    @height = height
+    @width = width
+    setup_console(height, width)
+    launch(command.map{ |c| quote_command_arg(c) }.join(' '))
+
+    case startup_message
     when String
-      assert_equal(expected_lines, actual_string, message)
+      wait_startup_message { |message| message.start_with?(startup_message) }
     when Regexp
-      assert_match(expected_lines, actual_string, message)
+      wait_startup_message { |message| startup_message.match?(message) }
     end
   end
 
-  def start_terminal(height, width, command, wait: 1, startup_message: nil)
-    @height = height
-    @width = width
-    @wait = wait
-    @result = nil
-    setup_console(height, width)
-    launch(command.map{ |c| quote_command_arg(c) }.join(' '))
-    case startup_message
-    when String
-      check_startup_message = ->(message) {
-        message.start_with?(
-          startup_message.each_char.each_slice(width).map(&:join).join("\0").gsub(/ *\0/, "\n")
-        )
-      }
-    when Regexp
-      check_startup_message = ->(message) { startup_message.match?(message) }
-    end
-    if check_startup_message
-      loop do
-        screen = retrieve_screen.join("\n").sub(/\n*\z/, "\n")
-        break if check_startup_message.(screen)
-        sleep @wait
+  private def wait_startup_message
+    wait_until = Time.now + @timeout
+    loop do
+      wait = wait_until - Time.now
+      if wait.negative?
+        raise "Startup message didn't arrive within timeout: #{chunks.inspect}"
       end
+
+      break if yield retrieve_screen.join("\n").sub(/\n*\z/, "\n")
+      sleep @wait
+    end
+  end
+
+  private def retryable_screen_assertion_with_proc(check_proc, assert_proc, convert_proc = :itself.to_proc)
+    retry_until = Time.now + @timeout
+    while Time.now < retry_until
+      break if @result
+
+      break if check_proc.call(convert_proc.call(retrieve_screen))
+      sleep @wait
+    end
+    assert_proc.call(convert_proc.call(@result || retrieve_screen))
+  end
+
+  def assert_screen(expected_lines, message = nil)
+    lines_to_string = ->(lines) { lines.join("\n").sub(/\n*\z/, "\n") }
+    case expected_lines
+    when Array
+      retryable_screen_assertion_with_proc(
+        ->(actual) { expected_lines == actual },
+        ->(actual) { assert_equal(expected_lines, actual, message) }
+      )
+    when String
+      retryable_screen_assertion_with_proc(
+        ->(actual) { expected_lines == actual },
+        ->(actual) { assert_equal(expected_lines, actual, message) },
+        lines_to_string
+      )
+    when Regexp
+      retryable_screen_assertion_with_proc(
+        ->(actual) { expected_lines.match?(actual) },
+        ->(actual) { assert_match(expected_lines, actual, message) },
+        lines_to_string
+      )
     end
   end
 end
