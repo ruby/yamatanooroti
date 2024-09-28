@@ -4,31 +4,29 @@ require 'tmpdir'
 class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
   def test_winsize
     start_terminal(5, 30, ['ruby', '-rio/console', '-e', 'puts(IO.console.winsize.inspect)'])
-    sleep 0.5
-    close
     assert_screen(<<~EOC)
       [5, 30]
     EOC
+    close
   end
 
   def test_wait_for_startup_message
-    code = 'sleep 1; puts "aaa"; sleep 10; puts "bbb"'
-    start_terminal(5, 30, ['ruby', '-e', code], startup_message: 'aaa')
-    # The start_terminal method waits 1 sec for "aaa" as specified by
-    # wait_for_startup_message option and close immediately by the close
-    # method at the next line. The next "bbb" after waiting 1 sec more doesn't
-    # be caught because I/O is already closed.
-    close
+    code = 'sleep 1; print "prompt>"; s = gets; sleep 1; puts s.upcase'
+    start_terminal(5, 30, ['ruby', '-e', code], startup_message: 'prompt>')
+    assert_equal(['prompt>', '', '', '', ''], result)
+    write "hello\n"
     assert_screen(<<~EOC)
-      aaa
+      prompt>hello
+      HELLO
     EOC
+    close
   end
 
   def test_move_cursor_and_render
     start_terminal(5, 30, ['ruby', '-rio/console', '-e', 'STDOUT.puts(?A);STDOUT.goto(2,2);STDOUT.puts(?B)'])
-    assert_screen(/^  B/)
-    close
+    assert_screen(['A', '', '  B', '', ''])
     assert_equal(['A', '', '  B', '', ''], result)
+    close
   end
 
   def test_meta_key
@@ -37,22 +35,22 @@ class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
     write('aaa ccc')
     write("\M-b")
     write('bbb ')
-    close
     assert_screen(<<~EOC)
       >>>aaa bbb ccc
     EOC
+    close
   ensure
     get_out_from_tmpdir
   end
 
   def test_assert_screen_takes_a_message_when_failed
     start_terminal(5, 30, ['ruby', '-e', 'puts "aaa"'])
-    close
     assert_raise_with_message Test::Unit::AssertionFailedError, /\Amessage when failed/ do
       assert_screen(<<~EOC, 'message when failed')
         bbb
       EOC
     end
+    close
   end
 
   private

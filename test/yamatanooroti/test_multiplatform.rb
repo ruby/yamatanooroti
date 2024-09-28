@@ -7,13 +7,13 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
 
   def test_example
     write(":a\n")
-    close
     assert_screen(['prompt> :a', '=> :a', 'prompt>', '', ''])
     assert_screen(<<~EOC)
       prompt> :a
       => :a
       prompt>
     EOC
+    close
   end
 
   def test_result_repeatedly
@@ -43,7 +43,6 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
 
   def test_auto_wrap
     write("12345678901234567890123\n")
-    close
     assert_screen(['prompt> 1234567890123456789012', '3', '=> 12345678901234567890123', 'prompt>', ''])
     assert_screen(<<~EOC)
       prompt> 1234567890123456789012
@@ -51,19 +50,20 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
       => 12345678901234567890123
       prompt>
     EOC
+    close
   end
 
   def test_fullwidth
     write(":あ\n")
-    close
     assert_screen(/=> :あ\nprompt>/)
     assert_equal(['prompt> :あ', '=> :あ', 'prompt>', '', ''], result)
+    close
   end
 
   def test_two_fullwidth
     write(":あい\n")
-    close
     assert_screen(/=> :あい\nprompt>/)
     assert_equal(['prompt> :あい', '=> :あい', 'prompt>', '', ''], result)
+    close
   end
 end
