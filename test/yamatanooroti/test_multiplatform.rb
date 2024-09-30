@@ -5,6 +5,10 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
     start_terminal(5, 30, ['ruby', 'bin/simple_repl'], startup_message: 'prompt>')
   end
 
+  def teardown
+    close
+  end
+
   def test_example
     write(":a\n")
     assert_screen(['prompt> :a', '=> :a', 'prompt>', '', ''])
@@ -13,7 +17,6 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
       => :a
       prompt>
     EOC
-    close
   end
 
   def test_result_repeatedly
@@ -23,14 +26,12 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
     write(":b\n")
     assert_screen(/=> :b\nprompt>/)
     assert_equal(['prompt> :a', '=> :a', 'prompt> :b', '=> :b', 'prompt>'], result)
-    close
   end
 
   def test_assert_screen_retries
     write("sleep 1\n")
     assert_screen(/=> 1\nprompt>/)
     assert_equal(['prompt> sleep 1', '=> 1', 'prompt>', '', ''], result)
-    close
   end
 
   def test_assert_screen_timeout
@@ -38,7 +39,6 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
     assert_raise do
       assert_screen(/=> 3\nprompt>/)
     end
-    close
   end
 
   def test_auto_wrap
@@ -50,20 +50,17 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
       => 12345678901234567890123
       prompt>
     EOC
-    close
   end
 
   def test_fullwidth
     write(":あ\n")
     assert_screen(/=> :あ\nprompt>/)
     assert_equal(['prompt> :あ', '=> :あ', 'prompt>', '', ''], result)
-    close
   end
 
   def test_two_fullwidth
     write(":あい\n")
     assert_screen(/=> :あい\nprompt>/)
     assert_equal(['prompt> :あい', '=> :あい', 'prompt>', '', ''], result)
-    close
   end
 end

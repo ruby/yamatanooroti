@@ -15,11 +15,8 @@ You can test the executed result and its rendering on the automatically detected
 require 'yamatanooroti'
 
 class MyTest < Yamatanooroti::TestCase
-  def setup
-    start_terminal(5, 30, ['irb', '-f', '--multiline'])
-  end
-
   def test_example
+    start_terminal(5, 30, ['irb', '-f', '--multiline'])
     write(":a\n")
     assert_screen(['irb(main):001:0> :a', '=> :a', 'irb(main):002:0>', '', ''])
     close
@@ -57,11 +54,8 @@ If you want to specify vterm environment that needs vterm gem, you can use `Yama
 require 'yamatanooroti'
 
 class MyTest < Yamatanooroti::VTermTestCase
-  def setup
-    start_terminal(5, 30, ['irb', '-f', '--multiline'])
-  end
-
   def test_example
+    start_terminal(5, 30, ['irb', '-f', '--multiline'])
     write(":a\n")
     assert_screen(['irb(main):001:0> :a', '=> :a', 'irb(main):002:0>', '', ''])
     close
