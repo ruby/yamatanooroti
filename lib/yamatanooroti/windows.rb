@@ -11,20 +11,13 @@ module Yamatanooroti::WindowsDefinition
   FREE = Fiddle::Function.new(Fiddle::RUBY_FREE, [Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
 
   typealias 'SHORT', 'short'
-  typealias 'HPCON', 'HANDLE'
   typealias 'HWND', 'HANDLE'
-  typealias 'HRESULT', 'HANDLE'
   typealias 'LPVOID', 'void*'
-  typealias 'SIZE_T', 'size_t'
   typealias 'LPWSTR', 'void*'
   typealias 'LPBYTE', 'void*'
   typealias 'LPCWSTR', 'void*'
-  typealias 'LPPROC_THREAD_ATTRIBUTE_LIST', 'void*'
-  typealias 'PSIZE_T', 'void*'
-  typealias 'DWORD_PTR', 'void*'
   typealias 'LPCVOID', 'void*'
   typealias 'LPDWORD', 'void*'
-  typealias 'LPOVERLAPPED', 'void*'
   typealias 'WCHAR', 'unsigned short'
   typealias 'LPCWCH', 'void*'
   typealias 'LPSTR', 'void*'
@@ -35,9 +28,6 @@ module Yamatanooroti::WindowsDefinition
   typealias 'LONG', 'int'
   typealias 'HLOCAL', 'HANDLE'
 
-  Fiddle::SIZEOF_HANDLE = Fiddle::SIZEOF_LONG
-  Fiddle::SIZEOF_HPCON = Fiddle::SIZEOF_LONG
-  Fiddle::SIZEOF_HRESULT = Fiddle::SIZEOF_LONG
   Fiddle::SIZEOF_DWORD = Fiddle::SIZEOF_LONG
   Fiddle::SIZEOF_WORD = Fiddle::SIZEOF_SHORT
 
@@ -53,7 +43,6 @@ module Yamatanooroti::WindowsDefinition
     'SHORT Right',
     'SHORT Bottom'
   ]
-  typealias 'SMALL_RECT*', 'DWORD64*'
   typealias 'PSMALL_RECT', 'SMALL_RECT*'
 
   CONSOLE_SCREEN_BUFFER_INFO = struct [
@@ -83,7 +72,6 @@ module Yamatanooroti::WindowsDefinition
     'LPVOID lpSecurityDescriptor',
     'BOOL bInheritHandle'
   ]
-  typealias 'PSECURITY_ATTRIBUTES', 'SECURITY_ATTRIBUTES*'
   typealias 'LPSECURITY_ATTRIBUTES', 'SECURITY_ATTRIBUTES*'
 
   STARTUPINFOW = struct [
@@ -114,7 +102,6 @@ module Yamatanooroti::WindowsDefinition
     'DWORD  dwProcessId',
     'DWORD  dwThreadId'
   ]
-  typealias 'PPROCESS_INFORMATION', 'PROCESS_INFORMATION*'
   typealias 'LPPROCESS_INFORMATION', 'PROCESS_INFORMATION*'
 
   INPUT_RECORD_WITH_KEY_EVENT = struct [
@@ -139,19 +126,13 @@ module Yamatanooroti::WindowsDefinition
   SW_SHOWNOACTIVE = 4
   LEFT_ALT_PRESSED = 0x0002
 
-  # HANDLE GetStdHandle(DWORD nStdHandle);
-  extern 'HANDLE GetStdHandle(DWORD);', :stdcall
   # BOOL CloseHandle(HANDLE hObject);
   extern 'BOOL CloseHandle(HANDLE);', :stdcall
 
   # BOOL FreeConsole(void);
   extern 'BOOL FreeConsole(void);', :stdcall
-  # BOOL AllocConsole(void);
-  extern 'BOOL AllocConsole(void);', :stdcall
   # BOOL AttachConsole(DWORD dwProcessId);
   extern 'BOOL AttachConsole(DWORD);', :stdcall
-  # BOOL ShowWindow(HWND hWnd, int nCmdShow);
-  extern 'BOOL ShowWindow(HWND hWnd,int nCmdShow);', :stdcall
   # HWND WINAPI GetConsoleWindow(void);
   extern 'HWND GetConsoleWindow(void);', :stdcall
   # BOOL WINAPI SetConsoleWindowInfo(HANDLE hConsoleOutput, BOOL bAbsolute, const SMALL_RECT *lpConsoleWindow);
@@ -197,9 +178,11 @@ module Yamatanooroti::WindowsDefinition
   FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
   FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
 
-  private def error_message(err, method_name)
-    string = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
-    FormatMessage(
+  private def error_message(r, method_name, exception: true)
+    return if not r.zero?
+    err = Fiddle.win32_last_error
+    string = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, FREE)
+    n = FormatMessageW(
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
       Fiddle::NULL,
       err,
@@ -208,24 +191,30 @@ module Yamatanooroti::WindowsDefinition
       0,
       Fiddle::NULL
     )
-    str = string.ptr.to_s
-    LocalFree(string)
-    str.force_encoding("Windows-31J")
-    puts "ERROR(#{method_name}): #{err.to_s}: #{string.ptr.to_s.force_encoding("locale")}"
+    if n > 0
+      str = wc2mb(string.ptr[0, n * 2])
+      LocalFree(string)
+      msg = "ERROR(#{method_name}): #{err.to_s}: #{str}"
+    end
+    if exception
+      raise msg
+    else
+      $stderr.puts msg
+    end
   end
 
   def get_console_screen_buffer_info(handle)
-    csbi = CONSOLE_SCREEN_BUFFER_INFO.malloc
+    csbi = CONSOLE_SCREEN_BUFFER_INFO.malloc(FREE)
     r = GetConsoleScreenBufferInfo(handle, csbi)
-    puts error_message(r, 'GetConsoleScreenBufferInfo') if r == 0
-    r == 0 ? nil : csbi
+    error_message(r, 'GetConsoleScreenBufferInfo')
+    return csbi
   end
 
   def set_console_screen_buffer_info_ex(handle, h, w, buffer_height)
-    csbi = CONSOLE_SCREEN_BUFFER_INFOEX.malloc
+    csbi = CONSOLE_SCREEN_BUFFER_INFOEX.malloc(FREE)
     csbi.cbSize = CONSOLE_SCREEN_BUFFER_INFOEX.size
     r = GetConsoleScreenBufferInfoEx(handle, csbi)
-    error_message(r, 'GetConsoleScreenBufferSize') if r == 0
+    error_message(r, 'GetConsoleScreenBufferSize')
     csbi.dwSize_X = w
     csbi.dwSize_Y = buffer_height
     csbi.Left = 0
@@ -233,18 +222,18 @@ module Yamatanooroti::WindowsDefinition
     csbi.Top = [csbi.Top, buffer_height - h].min
     csbi.Bottom = csbi.Top + h - 1
     r = SetConsoleScreenBufferInfoEx(handle, csbi)
-    puts error_message(r, 'SetConsoleScreenBufferInfoEx') if r == 0
+    error_message(r, 'SetConsoleScreenBufferInfoEx')
     return r != 0
   end
 
   def set_console_window_info(handle, h, w)
-    rect = SMALL_RECT.malloc
+    rect = SMALL_RECT.malloc(FREE)
     rect.Left = 0
     rect.Top = 0
     rect.Right = w - 1
     rect.Bottom = h - 1
     r = SetConsoleWindowInfo(handle, 1, rect)
-    puts error_message(r, 'SetConsoleWindowInfo') if r == 0
+    error_message(r, 'SetConsoleWindowInfo')
     return r != 0
   end
 
@@ -261,114 +250,164 @@ module Yamatanooroti::WindowsDefinition
     return true
   end
 
+  def create_console_file_handle(name)
+    fh = CreateFileA(
+      name,
+      GENERIC_READ | GENERIC_WRITE,
+      FILE_SHARE_READ | FILE_SHARE_WRITE,
+      nil,
+      OPEN_EXISTING,
+      0,
+      0
+    )
+    fh = [fh].pack("J").unpack1("J")
+    error_message(0, name) if fh == INVALID_HANDLE_VALUE
+    fh
+  end
+
+  def close_handle(handle)
+    r = CloseHandle(handle)
+    error_message(r, "CloseHandle")
+    return r != 0
+  end
+
+  def free_console
+    r = FreeConsole()
+    error_message(r, "FreeConsole")
+    return r != 0
+  end
+
+  def attach_console(pid = ATTACH_PARENT_PROCESS, maybe_fail: false)
+    r = AttachConsole(pid)
+    error_message(r, 'AttachConsole') unless maybe_fail
+    return r != 0
+  end
+
+  def create_console(command)
+    converted_command = mb2wc("#{command}\0")
+    console_process_info = PROCESS_INFORMATION.malloc(FREE)
+    console_process_info.to_ptr[0, PROCESS_INFORMATION.size] = "\0".b * PROCESS_INFORMATION.size
+    startup_info = STARTUPINFOW.malloc(FREE)
+    startup_info.to_ptr[0, STARTUPINFOW.size] = "\0".b * STARTUPINFOW.size
+    startup_info.cb = STARTUPINFOW.size
+    if false
+      startup_info.dwFlags = STARTF_USESHOWWINDOW
+      startup_info.wShowWindow = SW_SHOWNOACTIVE
+    else
+      startup_info.dwFlags = STARTF_USESHOWWINDOW
+      startup_info.wShowWindow = SW_HIDE
+    end
+
+    r = CreateProcessW(
+      Fiddle::NULL, converted_command,
+      Fiddle::NULL, Fiddle::NULL,
+      0,
+      CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT,
+      Fiddle::NULL, Fiddle::NULL,
+      startup_info, console_process_info
+    )
+    error_message(r, 'CreateProcessW')
+    console_process_info
+  end
+
+  def mb2wc(str)
+    size = MultiByteToWideChar(65001, 0, str, str.bytesize, '', 0)
+    converted_str = "\x00".b * (size * 2)
+    MultiByteToWideChar(65001, 0, str, str.bytesize, converted_str, size)
+    converted_str
+  end
+
+  def wc2mb(str)
+    size = WideCharToMultiByte(65001, 0, str, str.bytesize / 2, '', 0, 0, 0)
+    converted_str = "\x00".b * size
+    WideCharToMultiByte(65001, 0, str, str.bytesize / 2, converted_str, converted_str.bytesize, 0, 0)
+    converted_str.force_encoding("UTF-8")
+  end
+
+  def read_console_output(handle, row, width)
+    buffer_chars = width * 8
+    buffer = "\0".b * Fiddle::SIZEOF_SHORT * buffer_chars
+    n = "\0".b * Fiddle::SIZEOF_DWORD
+    r = ReadConsoleOutputCharacterW(handle, buffer, width, row << 16, n)
+    error_message(r, "ReadConsoleOutputCharacterW")
+    return wc2mb(buffer[0, n.unpack1("L") * 2]).gsub(/ *$/, "")
+  end
+
+  def set_input_record(r, code)
+    r.EventType = KEY_EVENT
+    # r.bKeyDown = 1
+    r.wRepeatCount = 1
+    r.dwControlKeyState = code < 0 ? LEFT_ALT_PRESSED : 0
+    code = code.abs
+    r.wVirtualKeyCode = VkKeyScanW(code)
+    r.wVirtualScanCode = MapVirtualKeyW(code, 0)
+    r.UnicodeChar = code
+    return r
+  end
+
+  def write_console_input(handle, records, n)
+    written = "\0".b * Fiddle::SIZEOF_DWORD
+    r = WriteConsoleInputW(handle, records, n, written)
+    error_message(r, 'WriteConsoleInput')
+    return written.unpack1('L')
+  end
+
+  def get_number_of_console_input_events(handle)
+    n = "\0".b * Fiddle::SIZEOF_DWORD
+    r = GetNumberOfConsoleInputEvents(handle, n)
+    error_message(r, 'GetNumberOfConsoleInputEvents')
+    return n.unpack1('L')
+  end
+
   extend self
 end
 
 module Yamatanooroti::WindowsTestCaseModule
   DL = Yamatanooroti::WindowsDefinition
 
-  private def attach_terminal
+  private def attach_terminal(open = true)
     stderr = $stderr
     $stderr = StringIO.new
 
     conin = conout = nil
-    r = DL.FreeConsole()
-    error_message(r, "FreeConsole")
-    r = DL.AttachConsole(@console_process_info.dwProcessId)
+    DL.free_console
     # this can be fail while new process is starting
-    # error_message(r, 'AttachConsole')
-    return nil if r.zero?
-    conin = DL.CreateFileA(
-      "conin$",
-      DL::GENERIC_READ | DL::GENERIC_WRITE,
-      DL::FILE_SHARE_READ | DL::FILE_SHARE_WRITE,
-      nil,
-      DL::OPEN_EXISTING,
-      0,
-      0
-    )
-    error_message(conin.to_i == DL::INVALID_HANDLE_VALUE ? 0 : 1, "conin$")
-    return nil if conin.to_i == DL::INVALID_HANDLE_VALUE
-    conout = DL.CreateFileA(
-      "conout$",
-      DL::GENERIC_READ | DL::GENERIC_WRITE,
-      DL::FILE_SHARE_READ | DL::FILE_SHARE_WRITE,
-      nil,
-      DL::OPEN_EXISTING,
-      0,
-      0
-    )
-    error_message(conout.to_i == DL::INVALID_HANDLE_VALUE ? 0 : 1, "conout$")
-    return nil if conout.to_i == DL::INVALID_HANDLE_VALUE
-    yield(conin.to_i, conout.to_i)
+    r = DL.attach_console(@console_process_info.dwProcessId, maybe_fail: true)
+    return nil unless r
+
+    if open
+      conin = DL.create_console_file_handle("conin$")
+      return nil if conin == DL::INVALID_HANDLE_VALUE
+
+      conout = DL.create_console_file_handle("conout$")
+      return nil if conout == DL::INVALID_HANDLE_VALUE
+    end
+
+    yield(conin, conout)
   rescue => evar
   ensure
-    if conin != nil && conin.to_i != DL::INVALID_HANDLE_VALUE
-      r = DL.CloseHandle(conin)
-      error_message(r, "CloseHandle")
-    end
-    if conout != nil && conout.to_i != DL::INVALID_HANDLE_VALUE
-      r = DL.CloseHandle(conout)
-      error_message(r, "CloseHandle")
-    end
-    r = DL.FreeConsole()
-    error_message(r, "FreeConsole")
-    r = DL.AttachConsole(DL::ATTACH_PARENT_PROCESS)
-    error_message(r, 'AttachConsole')
-    stderr.write $stderr.read
+    DL.close_handle(conin) if conin && conin != DL::INVALID_HANDLE_VALUE
+    DL.close_handle(conout) if conout && conout != DL::INVALID_HANDLE_VALUE
+    DL.free_console
+    DL.attach_console
+    stderr.write $stderr.string
     $stderr = stderr
     raise evar if evar
   end
 
   private def setup_console(height, width)
-    command = %q[ruby.exe --disable=gems -e sleep"] # 'DO NOTHING JUST STAY THERE' CONSOLE KEEPING PROCESS
-    converted_command = mb2wc("#{command}\x00")
-    @console_process_info = DL::PROCESS_INFORMATION.malloc
-    @console_process_info.to_ptr[0, DL::PROCESS_INFORMATION.size] = "\x00".b * DL::PROCESS_INFORMATION.size
-    startup_info = DL::STARTUPINFOW.malloc
-    (startup_info.to_ptr + 0)[0, DL::STARTUPINFOW.size] = "\x00".b * DL::STARTUPINFOW.size
-    startup_info.cb = DL::STARTUPINFOW.size
-    if ENV['YAMATANOOROTI_SHOW_WINDOW']
-      startup_info.dwFlags = DL::STARTF_USESHOWWINDOW
-      startup_info.wShowWindow = DL::SW_SHOWNOACTIVE
-    else
-      startup_info.dwFlags = DL::STARTF_USESHOWWINDOW
-      startup_info.wShowWindow = DL::SW_HIDE
-    end
-
-    r = DL.CreateProcessW(
-      Fiddle::NULL, converted_command,
-      Fiddle::NULL, Fiddle::NULL,
-      0,
-      DL::CREATE_NEW_CONSOLE | DL::CREATE_UNICODE_ENVIRONMENT,
-      Fiddle::NULL, Fiddle::NULL,
-      startup_info, @console_process_info
-    )
-    error_message(r, 'CreateProcessW')
+    command = %q[ruby.exe --disable=gems -e sleep"] # console keeping process
+    @console_process_info = DL.create_console(command)
 
     # wait for console startup complete
     8.times do |n|
       break if attach_terminal { true }
-      sleep 0.02 * 2**n
+      sleep 0.01 * 2**n
     end
 
     attach_terminal do |conin, conout|
       DL.set_console_window_size(conout, height, width)
     end
-  end
-
-  private def mb2wc(str)
-    size = DL.MultiByteToWideChar(65001, 0, str, str.bytesize, '', 0)
-    converted_str = String.new("\x00" * (size * 2), encoding: 'ASCII-8BIT')
-    DL.MultiByteToWideChar(65001, 0, str, str.bytesize, converted_str, size)
-    converted_str
-  end
-
-  private def wc2mb(str)
-    size = DL.WideCharToMultiByte(65001, 0, str, str.bytesize / 2, '', 0, 0, 0)
-    converted_str = "\x00" * size
-    DL.WideCharToMultiByte(65001, 0, str, str.bytesize / 2, converted_str, converted_str.bytesize, 0, 0)
-    converted_str
   end
 
   private def quote_command_arg(arg)
@@ -465,88 +504,42 @@ module Yamatanooroti::WindowsTestCaseModule
     @codepage_success_p
   end
 
-  private def error_message(r, method_name)
-    return if not r.zero?
-    err = Fiddle.win32_last_error
-    string = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
-    n = DL.FormatMessageW(
-      DL::FORMAT_MESSAGE_ALLOCATE_BUFFER | DL::FORMAT_MESSAGE_FROM_SYSTEM,
-      Fiddle::NULL,
-      err,
-      0x0,
-      string,
-      0,
-      Fiddle::NULL
-    )
-    if n > 0
-      str = wc2mb(string.ptr[0, n * 2])
-      LocalFree(string)
-      $stderr.puts "ERROR(#{method_name}): #{err.to_s}: #{str}"
-    end
-  end
-
-  private def log(str)
-    $stderr.puts str
-  end
-
   def write(str)
-    sleep @wait
-    records = Fiddle::Pointer.malloc(DL::INPUT_RECORD_WITH_KEY_EVENT.size * str.size * 2, DL::FREE)
-    str.chars.each_with_index do |c, i|
+    codes = str.chars.map do |c|
       c = "\r" if c == "\n"
       byte = c.getbyte(0)
       if c.bytesize == 1 and byte.allbits?(0x80) # with Meta key
-        c = (byte ^ 0x80).chr
-        control_key_state = DL::LEFT_ALT_PRESSED
+        [-(byte ^ 0x80)]
       else
-        control_key_state = 0
+        DL.mb2wc(c).unpack("S*")
       end
-      record_index = i * 2
-      r = DL::INPUT_RECORD_WITH_KEY_EVENT.new(records + DL::INPUT_RECORD_WITH_KEY_EVENT.size * record_index)
-      set_input_record(r, c, true, control_key_state)
-      record_index = i * 2 + 1
-      r = DL::INPUT_RECORD_WITH_KEY_EVENT.new(records + DL::INPUT_RECORD_WITH_KEY_EVENT.size * record_index)
-      set_input_record(r, c, false, control_key_state)
+    end.flatten
+    record = DL::INPUT_RECORD_WITH_KEY_EVENT.malloc(DL::FREE)
+    records = codes.reduce("".b) do |records, code|
+      DL.set_input_record(record, code)
+      record.bKeyDown = 1
+      records << record.to_ptr.to_str
+      record.bKeyDown = 0
+      records << record.to_ptr.to_str
     end
-    written_size = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, DL::FREE)
     attach_terminal do |conin, conout|
-      r = DL.WriteConsoleInputW(conin, records, str.size * 2, written_size)
-      error_message(r, 'WriteConsoleInput')
-
-      n = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, DL::FREE)
+      DL.write_console_input(conin, records, codes.size * 2)
       loop do
-        sleep 0.02
-        r = DL.GetNumberOfConsoleInputEvents(conin, n)
-        error_message(r, 'GetNumberOfConsoleInputEvents')
-        break if n.to_str.unpack1("L") <= 1 # key up record still remains
+        sleep @wait
+        n = DL.get_number_of_console_input_events(conin)
+        break if n <= 1  # maybe keyup event still be there
+        break if n.nil?
         @target.sync
         break if @target.closed?
       end
     end
   end
 
-  private def set_input_record(r, c, key_down, control_key_state)
-    begin
-      code = c.unpack('U').first
-    rescue ArgumentError
-      code = c.bytes.first
-    end
-    r.EventType = DL::KEY_EVENT
-    r.bKeyDown = key_down ? 1 : 0
-    r.wRepeatCount = 1
-    r.wVirtualKeyCode = DL.VkKeyScanW(code)
-    r.wVirtualScanCode = DL.MapVirtualKeyW(code, 0)
-    r.UnicodeChar = code
-    r.dwControlKeyState = control_key_state
-  end
-
   private def free_resources
     system("taskkill.exe", "/PID", "#{@pid}", {[:out, :err] => "NUL"})
     system("taskkill.exe", "/PID", "#{@console_process_info.dwProcessId}", {[:out, :err] => "NUL"})
-    r = DL.CloseHandle(@console_process_info.hProcess)
-    error_message(r, "CloseHandle(hProcess)")
-    r = DL.CloseHandle(@console_process_info.hThread)
-    error_message(r, "CloseHandle(hThread)")
+    DL.close_handle(@console_process_info.hProcess)
+    DL.close_handle(@console_process_info.hThread)
   end
 
   def close
@@ -575,13 +568,7 @@ module Yamatanooroti::WindowsTestCaseModule
     n = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, DL::FREE)
     lines = attach_terminal do |conin, conout|
       (top..bottom).map do |y|
-        r = DL.ReadConsoleOutputCharacterW(conout, buffer, @width, y << 16, n)
-        error_message(r, "ReadConsoleOutputCharacterW")
-        if r != 0
-          wc2mb(buffer[0, n.to_str.unpack1("L") * 2]).gsub(/ *$/, "")
-        else
-          ""
-        end
+        DL.read_console_output(conout, y, @width) || ""
       end
     end
     lines
