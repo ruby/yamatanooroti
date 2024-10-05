@@ -1,5 +1,3 @@
-require 'test/unit'
-require 'stringio'
 require 'fiddle/import'
 require 'fiddle/types'
 
@@ -307,7 +305,9 @@ module Yamatanooroti::WindowsDefinition
       startup_info, console_process_info
     )
     error_message(r, 'CreateProcessW')
-    console_process_info
+    close_handle(console_process_info.hProcess)
+    close_handle(console_process_info.hThread)
+    return console_process_info.dwProcessId
   end
 
   def mb2wc(str)
@@ -325,12 +325,11 @@ module Yamatanooroti::WindowsDefinition
   end
 
   def read_console_output(handle, row, width)
-    buffer_chars = width * 8
-    buffer = "\0".b * Fiddle::SIZEOF_SHORT * buffer_chars
-    n = "\0".b * Fiddle::SIZEOF_DWORD
+    buffer = Fiddle::Pointer.malloc(Fiddle::SIZEOF_SHORT * width, FREE)
+    n = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     r = ReadConsoleOutputCharacterW(handle, buffer, width, row << 16, n)
     error_message(r, "ReadConsoleOutputCharacterW")
-    return wc2mb(buffer[0, n.unpack1("L") * 2]).gsub(/ *$/, "")
+    return wc2mb(buffer[0, n.to_str.unpack1("L") * 2]).gsub(/ *$/, "")
   end
 
   def set_input_record(r, code)
@@ -346,314 +345,18 @@ module Yamatanooroti::WindowsDefinition
   end
 
   def write_console_input(handle, records, n)
-    written = "\0".b * Fiddle::SIZEOF_DWORD
+    written = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     r = WriteConsoleInputW(handle, records, n, written)
     error_message(r, 'WriteConsoleInput')
-    return written.unpack1('L')
+    return written.to_str.unpack1('L')
   end
 
   def get_number_of_console_input_events(handle)
-    n = "\0".b * Fiddle::SIZEOF_DWORD
+    n = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     r = GetNumberOfConsoleInputEvents(handle, n)
     error_message(r, 'GetNumberOfConsoleInputEvents')
-    return n.unpack1('L')
+    return n.to_str.unpack1('L')
   end
 
   extend self
-end
-
-module Yamatanooroti::WindowsTestCaseModule
-  DL = Yamatanooroti::WindowsDefinition
-
-  private def attach_terminal(open = true)
-    stderr = $stderr
-    $stderr = StringIO.new
-
-    conin = conout = nil
-    DL.free_console
-    # this can be fail while new process is starting
-    r = DL.attach_console(@console_process_info.dwProcessId, maybe_fail: true)
-    return nil unless r
-
-    if open
-      conin = DL.create_console_file_handle("conin$")
-      return nil if conin == DL::INVALID_HANDLE_VALUE
-
-      conout = DL.create_console_file_handle("conout$")
-      return nil if conout == DL::INVALID_HANDLE_VALUE
-    end
-
-    yield(conin, conout)
-  rescue => evar
-  ensure
-    DL.close_handle(conin) if conin && conin != DL::INVALID_HANDLE_VALUE
-    DL.close_handle(conout) if conout && conout != DL::INVALID_HANDLE_VALUE
-    DL.free_console
-    DL.attach_console
-    stderr.write $stderr.string
-    $stderr = stderr
-    raise evar if evar
-  end
-
-  private def setup_console(height, width)
-    command = %q[ruby.exe --disable=gems -e sleep"] # console keeping process
-    @console_process_info = DL.create_console(command)
-
-    # wait for console startup complete
-    8.times do |n|
-      break if attach_terminal { true }
-      sleep 0.01 * 2**n
-    end
-
-    attach_terminal do |conin, conout|
-      DL.set_console_window_size(conout, height, width)
-    end
-  end
-
-  private def quote_command_arg(arg)
-    if not arg.match?(/[ \t"<>|()]/)
-      # No quotation needed.
-      return arg
-    end
-
-    if not arg.match?(/["\\]/)
-      # No embedded double quotes or backlashes, so I can just wrap quote
-      # marks around the whole thing.
-      return %{"#{arg}"}
-    end
-
-    quote_hit = true
-    result = +'"'
-    arg.chars.reverse.each do |c|
-      result << c
-      if quote_hit and c == '\\'
-        result << '\\'
-      elsif c == '"'
-        quote_hit = true
-        result << '\\'
-      else
-        quote_hit = false
-      end
-    end
-    result << '"'
-    result.reverse
-  end
-
-  class SubProcess
-    def initialize(command)
-      @errin, err = IO.pipe
-      @pid = spawn(command, {in: ["conin$", File::RDWR | File::BINARY], out: ["conout$", File::RDWR | File::BINARY], err: err})
-      err.close
-      @closed = false
-      @status = nil
-      @q = Thread::Queue.new
-      @t = Thread.new do
-        begin
-          err = @errin.gets
-          @q << err if err
-        rescue IOError
-          # target process already terminated
-          next
-        end
-      end
-    end
-
-    def closed?
-      @closed ||= !(@status = Process.wait2(@pid, Process::WNOHANG)).nil?
-    end
-
-    private def consume(buffer)
-      while !@q.empty?
-        buffer << @q.shift
-      end
-    end
-
-    def ensure_close
-      @errin.close if !@errin.closed?
-    end
-
-    def sync
-      buffer = ""
-      if closed?
-        @t.kill
-        @t.join
-        consume(buffer)
-        rest = "".b
-        while ((str = @errin.read_nonblock(1024, exception: false)).is_a?(String)) do
-          rest << str
-        end
-        buffer << rest.force_encoding(Encoding.default_external) << "\n" if rest != ""
-      else
-        consume(buffer)
-      end
-      $stderr.write buffer if buffer != ""
-    end
-  end
-
-  private def launch(command)
-    attach_terminal do
-      SubProcess.new(command)
-    end
-  end
-
-  private def setup_cp(cp)
-    @codepage_success_p = attach_terminal { system("chcp #{Integer(cp)} > NUL") }
-  end
-
-  private def codepage_success?
-    @codepage_success_p
-  end
-
-  def write(str)
-    codes = str.chars.map do |c|
-      c = "\r" if c == "\n"
-      byte = c.getbyte(0)
-      if c.bytesize == 1 and byte.allbits?(0x80) # with Meta key
-        [-(byte ^ 0x80)]
-      else
-        DL.mb2wc(c).unpack("S*")
-      end
-    end.flatten
-    record = DL::INPUT_RECORD_WITH_KEY_EVENT.malloc(DL::FREE)
-    records = codes.reduce("".b) do |records, code|
-      DL.set_input_record(record, code)
-      record.bKeyDown = 1
-      records << record.to_ptr.to_str
-      record.bKeyDown = 0
-      records << record.to_ptr.to_str
-    end
-    attach_terminal do |conin, conout|
-      DL.write_console_input(conin, records, codes.size * 2)
-      loop do
-        sleep @wait
-        n = DL.get_number_of_console_input_events(conin)
-        break if n <= 1  # maybe keyup event still be there
-        break if n.nil?
-        @target.sync
-        break if @target.closed?
-      end
-    end
-  end
-
-  private def free_resources
-    system("taskkill.exe", "/PID", "#{@pid}", {[:out, :err] => "NUL"})
-    system("taskkill.exe", "/PID", "#{@console_process_info.dwProcessId}", {[:out, :err] => "NUL"})
-    DL.close_handle(@console_process_info.hProcess)
-    DL.close_handle(@console_process_info.hThread)
-  end
-
-  def close
-    @target.sync
-    sleep @wait if !@target.closed?
-    # read first before kill the console process including output
-    @result = retrieve_screen
-
-    free_resources
-    @target.sync
-    @target.ensure_close
-  end
-
-  private def retrieve_screen(top_of_buffer: false)
-    top, bottom = attach_terminal do |conin, conout|
-      csbi = DL.get_console_screen_buffer_info(conout)
-      if top_of_buffer
-        [0, csbi.Bottom]
-      else
-        [csbi.Top, csbi.Bottom]
-      end
-    end
-
-    buffer_chars = @width * 8
-    buffer = Fiddle::Pointer.malloc(Fiddle::SIZEOF_SHORT * buffer_chars, DL::FREE)
-    n = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, DL::FREE)
-    lines = attach_terminal do |conin, conout|
-      (top..bottom).map do |y|
-        DL.read_console_output(conout, y, @width) || ""
-      end
-    end
-    lines
-  end
-
-  def result
-    @result || retrieve_screen
-  end
-
-  def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil, codepage: nil)
-    @timeout = timeout
-    @wait = wait
-    @result = nil
-    @codepage_success_p
-
-    @height = height
-    @width = width
-    setup_console(height, width)
-    setup_cp(codepage) if codepage
-    @target = launch(command.map{ |c| quote_command_arg(c) }.join(' '))
-
-    case startup_message
-    when String
-      wait_startup_message { |message| message.start_with?(startup_message) }
-    when Regexp
-      wait_startup_message { |message| startup_message.match?(message) }
-    end
-  end
-
-  private def wait_startup_message
-    wait_until = Time.now + @timeout
-    chunks = +''
-    loop do
-      wait = wait_until - Time.now
-      if wait.negative?
-        raise "Startup message didn't arrive within timeout: #{chunks.inspect}"
-      end
-
-      @target.sync
-      chunks = retrieve_screen.join("\n").sub(/\n*\z/, "\n")
-      break if yield chunks
-      sleep @wait
-    end
-  end
-
-  private def retryable_screen_assertion_with_proc(check_proc, assert_proc, convert_proc = :itself.to_proc)
-    retry_until = Time.now + @timeout
-    screen = if @result
-      convert_proc.call(@result)
-    else
-      loop do
-        @target.sync
-        screen = convert_proc.call(retrieve_screen)
-        break screen if Time.now >= retry_until
-        break screen if check_proc.call(screen)
-        sleep @wait
-      end
-    end
-    assert_proc.call(screen)
-  end
-
-  def assert_screen(expected_lines, message = nil)
-    lines_to_string = ->(lines) { lines.join("\n").sub(/\n*\z/, "\n") }
-    case expected_lines
-    when Array
-      retryable_screen_assertion_with_proc(
-        ->(actual) { expected_lines == actual },
-        ->(actual) { assert_equal(expected_lines, actual, message) }
-      )
-    when String
-      retryable_screen_assertion_with_proc(
-        ->(actual) { expected_lines == actual },
-        ->(actual) { assert_equal(expected_lines, actual, message) },
-        lines_to_string
-      )
-    when Regexp
-      retryable_screen_assertion_with_proc(
-        ->(actual) { expected_lines.match?(actual) },
-        ->(actual) { assert_match(expected_lines, actual, message) },
-        lines_to_string
-      )
-    end
-  end
-end
-
-class Yamatanooroti::WindowsTestCase < Test::Unit::TestCase
-  include Yamatanooroti::WindowsTestCaseModule
 end
