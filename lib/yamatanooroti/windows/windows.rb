@@ -11,6 +11,7 @@ module Yamatanooroti::WindowsTermMixin
     $stderr = StringIO.new
 
     conin = conout = nil
+    check_interrupt
     DL.free_console
     # this can be fail while new process is starting
     r = DL.attach_console(@console_process_id, maybe_fail: true)
@@ -68,7 +69,9 @@ module Yamatanooroti::WindowsTermMixin
   class SubProcess
     def initialize(command)
       @errin, err = IO.pipe
-      @pid = spawn(command, {in: ["conin$", File::RDWR | File::BINARY], out: ["conout$", File::RDWR | File::BINARY], err: err})
+      DL.restore_console_control_handler do
+        @pid = spawn(command, {in: ["conin$", File::RDWR | File::BINARY], out: ["conout$", File::RDWR | File::BINARY], err: err})
+      end
       @mon = Process.detach(@pid)
       err.close
       @closed = false
@@ -91,7 +94,7 @@ module Yamatanooroti::WindowsTermMixin
           Process.kill("KILL", @pid)
         rescue Errno::ESRCH # No such process
         end
-        @status = @mon.join.value
+        @status = @mon.join.value.exitstatus
         sync
         @errin.close
       end
@@ -128,6 +131,7 @@ module Yamatanooroti::WindowsTermMixin
   end
 
   def launch(command)
+    check_interrupt
     attach_terminal do
       @target = SubProcess.new(command.map{ |c| quote_command_arg(c) }.join(' '))
     end
@@ -142,6 +146,7 @@ module Yamatanooroti::WindowsTermMixin
   end
 
   def write(str)
+    check_interrupt
     codes = str.chars.map do |c|
       c = "\r" if c == "\n"
       byte = c.getbyte(0)
@@ -174,6 +179,7 @@ module Yamatanooroti::WindowsTermMixin
 
   def retrieve_screen(top_of_buffer: false)
     return @result if @result
+    check_interrupt
     @target.sync
     top, bottom, width = attach_terminal do |conin, conout|
       csbi = DL.get_console_screen_buffer_info(conout)
@@ -194,5 +200,15 @@ module Yamatanooroti::WindowsTermMixin
 
   def result
     @result || retrieve_screen
+  end
+
+  def check_interrupt
+    raise_interrupt if DL.interrupted?
+  end
+
+  def raise_interrupt
+    close
+    DL.at_exit
+    raise Interrupt
   end
 end

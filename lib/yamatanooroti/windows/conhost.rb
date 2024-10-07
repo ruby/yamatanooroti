@@ -24,11 +24,15 @@ class Yamatanooroti::ConhostTerm
   end
 
   def close
-    @target.close
-    @result = retrieve_screen
+    if @target && !@target.closed?
+      @target.close
+    end
+    @result ||= retrieve_screen if !DL.interrupted?
     begin
-      Process.kill("KILL", @console_process_id)
+      Process.kill("KILL", @console_process_id) if @console_process_id
     rescue Errno::ESRCH # No such process
+    ensure
+      @console_process_id = nil
     end
   end
 end

@@ -17,19 +17,17 @@ end
 class Yamatanooroti::TestWindowsCodepage < Yamatanooroti::TestCase
   if Yamatanooroti.win?
     def test_codepage_932
-      start_terminal(5, 30, ['ruby', '-e', 'puts(Encoding.find(%Q[locale]).name)'], codepage: 932)
-      sleep 0.5
-      close
+      start_terminal(5, 30, ['ruby', '-e', 'puts(%Q!Encoding:#{Encoding.find(%Q[locale]).name}!)'], startup_message: 'Encoding:', codepage: 932)
       omit "codepage 932 not supported" if !codepage_success?
-      assert_equal(['Windows-31J', '', '', '', ''], result)
+      assert_equal(['Encoding:Windows-31J', '', '', '', ''], result)
+      close
     end
 
     def test_codepage_437
-      start_terminal(5, 30, ['ruby', '-e', 'puts(Encoding.find(%Q[locale]).name)'], codepage: 437)
-      sleep 0.5
-      close
+      start_terminal(5, 30, ['ruby', '-e', 'puts(%Q!Encoding:#{Encoding.find(%Q[locale]).name}!)'], startup_message: 'Encoding:', codepage: 437)
       omit "codepage 437 not supported" if !codepage_success?
-      assert_equal(['IBM437', '', '', '', ''], result)
+      assert_equal(['Encoding:IBM437', '', '', '', ''], result)
+      close
     end
   end
 end

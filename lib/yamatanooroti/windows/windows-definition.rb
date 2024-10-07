@@ -176,6 +176,9 @@ module Yamatanooroti::WindowsDefinition
   FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
   FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
 
+  # BOOL WINAPI SetConsoleCtrlHandler(PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
+  extern 'BOOL SetConsoleCtrlHandler(void *, BOOL Add);', :stdcall
+
   private def error_message(r, method_name, exception: true)
     return if not r.zero?
     err = Fiddle.win32_last_error
@@ -296,15 +299,17 @@ module Yamatanooroti::WindowsDefinition
       startup_info.wShowWindow = SW_HIDE
     end
 
-    r = CreateProcessW(
-      Fiddle::NULL, converted_command,
-      Fiddle::NULL, Fiddle::NULL,
-      0,
-      CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT,
-      Fiddle::NULL, Fiddle::NULL,
-      startup_info, console_process_info
-    )
-    error_message(r, 'CreateProcessW')
+    restore_console_control_handler do
+      r = CreateProcessW(
+        Fiddle::NULL, converted_command,
+        Fiddle::NULL, Fiddle::NULL,
+        0,
+        CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT,
+        Fiddle::NULL, Fiddle::NULL,
+        startup_info, console_process_info
+      )
+      error_message(r, 'CreateProcessW')
+    end
     close_handle(console_process_info.hProcess)
     close_handle(console_process_info.hThread)
     return console_process_info.dwProcessId
@@ -356,6 +361,48 @@ module Yamatanooroti::WindowsDefinition
     r = GetNumberOfConsoleInputEvents(handle, n)
     error_message(r, 'GetNumberOfConsoleInputEvents')
     return n.to_str.unpack1('L')
+  end
+
+  # Ctrl+C trap support
+  # FreeConsole(), AttachConsole() clears console control handlers.
+  # Make matter worse, C runtime does not provide the function to restore that handlers.
+  # Yamatanooroti will ignore Ctrl+C and monitors the end of decoy process.
+
+  def self.ignore_console_control_handler
+    SetConsoleCtrlHandler(0, 1)
+  end
+
+  def self.restore_console_control_handler(&block)
+    SetConsoleCtrlHandler(0, 0)
+    if block_given?
+      yield
+      SetConsoleCtrlHandler(0, 1)
+    end
+  end
+
+  @interrupt_monitor_pid = spawn("ruby --disable=gems -e sleep", [:out, :err] => "NUL")
+  @interrupt_monitor = Process.detach(@interrupt_monitor_pid)
+  ignore_console_control_handler
+  @interrupted_p = nil
+
+  def self.interrupted?
+    @interrupted_p ||
+    unless @interrupt_monitor.alive?
+      @interrupted_p = (@interrupt_monitor.value.exitstatus == 3)
+    end
+  end
+
+  def self.at_exit
+    if @interrupt_monitor.alive?
+      begin
+        Process.kill("KILL", @interrupt_monitor_pid)
+      rescue Errno::ESRCH # No such process
+      end
+    end
+  end
+
+  Test::Unit.at_exit do
+    self.at_exit
   end
 
   extend self
