@@ -1,4 +1,63 @@
 require 'stringio'
+require 'win32/registry'
+
+module Yamatanooroti::WindowsConsoleSettings
+  DelegationConsoleSetting = {
+    conhost:  "{B23D10C0-E52E-411E-9D5B-C09FDF709C7D}",
+    terminal: "{2EACA947-7F5F-4CFA-BA87-8F7FBEEFBE69}",
+    preview:  "{06EC847C-C0A5-46B8-92CB-7C92F6E35CD5}",
+  }.freeze
+  DelegationTerminalSetting = {
+    conhost:  "{B23D10C0-E52E-411E-9D5B-C09FDF709C7D}",
+    terminal: "{E12CFF52-A866-4C77-9A90-F570A7AA2C6B}",
+    preview:  "{86633F1F-6454-40EC-89CE-DA4EBA977EE2}",
+  }.freeze
+
+  begin
+    Win32::Registry::HKEY_CURRENT_USER.open('Console') do |reg|
+      @orig_conhost = reg['ForceV2']
+    end
+  rescue Win32::Registry::Error
+  end
+  begin
+    Win32::Registry::HKEY_CURRENT_USER.open('Console\%%Startup') do |reg|
+      @orig_console = reg['DelegationConsole']
+      @orig_terminal = reg['DelegationTerminal']
+    end
+  rescue Win32::Registry::Error
+  end
+
+  Test::Unit.at_start do
+    case Yamatanooroti.options.windows.to_s
+    when "conhost"
+      Win32::Registry::HKEY_CURRENT_USER.open('Console', Win32::Registry::KEY_WRITE) do |reg|
+        reg['ForceV2', Win32::Registry::REG_DWORD] = 1
+      end
+      Win32::Registry::HKEY_CURRENT_USER.open('Console\%%Startup', Win32::Registry::KEY_WRITE) do |reg|
+        reg['DelegationConsole', Win32::Registry::REG_SZ] = DelegationConsoleSetting[:conhost]
+        reg['DelegationTerminal', Win32::Registry::REG_SZ] = DelegationTerminalSetting[:conhost]
+      end if @orig_console && @orig_terminal
+    when "legacy-conhost"
+      Win32::Registry::HKEY_CURRENT_USER.open('Console', Win32::Registry::KEY_WRITE) do |reg|
+        reg['ForceV2', Win32::Registry::REG_DWORD] = 0
+      end
+      Win32::Registry::HKEY_CURRENT_USER.open('Console\%%Startup', Win32::Registry::KEY_WRITE) do |reg|
+        reg['DelegationConsole', Win32::Registry::REG_SZ] = DelegationConsoleSetting[:conhost]
+        reg['DelegationTerminal', Win32::Registry::REG_SZ] = DelegationTerminalSetting[:conhost]
+      end if @orig_console && @orig_terminal
+    end
+  end
+
+  Test::Unit.at_exit do
+    Win32::Registry::HKEY_CURRENT_USER.open('Console', Win32::Registry::KEY_WRITE) do |reg|
+      reg['ForceV2', Win32::Registry::REG_DWORD] = @orig_conhost
+    end if @orig_conhost
+    Win32::Registry::HKEY_CURRENT_USER.open('Console\%%Startup', Win32::Registry::KEY_WRITE) do |reg|
+      reg['DelegationConsole', Win32::Registry::REG_SZ] = @orig_console
+      reg['DelegationTerminal', Win32::Registry::REG_SZ] = @orig_terminal
+    end if @orig_console && @orig_terminal
+  end
+end
 
 module Yamatanooroti::WindowsTermMixin
   DL = Yamatanooroti::WindowsDefinition
@@ -207,7 +266,7 @@ module Yamatanooroti::WindowsTermMixin
   end
 
   def raise_interrupt
-    close
+    close_console
     DL.at_exit
     raise Interrupt
   end

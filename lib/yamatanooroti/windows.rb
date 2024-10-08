@@ -20,11 +20,10 @@ module Yamatanooroti::WindowsTestCaseModule
     @terminal.codepage_success?
   end
 
-  def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil, codepage: nil)
-    @timeout = timeout
-    @wait = wait
+  def start_terminal(height, width, command, wait: nil, timeout: nil, startup_message: nil, codepage: nil)
+    @timeout = timeout || Yamatanooroti.options.default_timeout
+    @wait = wait || Yamatanooroti.options.default_wait
     @result = nil
-
     @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait)
     @terminal.setup_cp(codepage) if codepage
     @terminal.launch(command)
@@ -87,6 +86,18 @@ module Yamatanooroti::WindowsTestCaseModule
         ->(actual) { assert_match(expected_lines, actual, message) },
         lines_to_string
       )
+    end
+  end
+
+  def self.included(cls)
+    cls.instance_exec do
+      teardown do
+        if !Yamatanooroti.options.show_console ||
+            Yamatanooroti.options.close_console == :always || 
+            Yamatanooroti.options.close_console == :pass && passed?
+          @terminal.close_console
+        end
+      end
     end
   end
 end

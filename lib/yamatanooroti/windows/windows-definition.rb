@@ -122,6 +122,7 @@ module Yamatanooroti::WindowsDefinition
   KEY_EVENT = 0x0001
   SW_HIDE = 0
   SW_SHOWNOACTIVE = 4
+  SW_SHOWMINNOACTIVE = 7
   LEFT_ALT_PRESSED = 0x0002
 
   # BOOL CloseHandle(HANDLE hObject);
@@ -291,12 +292,12 @@ module Yamatanooroti::WindowsDefinition
     startup_info = STARTUPINFOW.malloc(FREE)
     startup_info.to_ptr[0, STARTUPINFOW.size] = "\0".b * STARTUPINFOW.size
     startup_info.cb = STARTUPINFOW.size
-    if false
+    if Yamatanooroti.options.show_console
       startup_info.dwFlags = STARTF_USESHOWWINDOW
       startup_info.wShowWindow = SW_SHOWNOACTIVE
     else
       startup_info.dwFlags = STARTF_USESHOWWINDOW
-      startup_info.wShowWindow = SW_HIDE
+      startup_info.wShowWindow = Yamatanooroti.options.windows.to_s == "legacy-conhost" ? SW_SHOWMINNOACTIVE : SW_HIDE
     end
 
     restore_console_control_handler do
