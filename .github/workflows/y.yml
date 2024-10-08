@@ -42,3 +42,24 @@ jobs:
         run: |
           bundle install
           bundle exec rake test
+  windows-conhost:
+    name: >-
+      ${{ matrix.os }} ${{ matrix.ruby }} ${{ matrix.console }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-2019, windows-2022 ]
+        ruby: [ 3.3, mingw ]
+        console: [ conhost, legacy-conhost ]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - name: rake test
+        run: |
+          rake test TESTOPTS="--windows=${{ matrix.console }}"
