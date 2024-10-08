@@ -30,6 +30,7 @@ module Yamatanooroti::WindowsConsoleSettings
   Test::Unit.at_start do
     case Yamatanooroti.options.windows.to_s
     when "conhost"
+      puts "use conhost(classic, conhostV2) for windows console"
       Win32::Registry::HKEY_CURRENT_USER.open('Console', Win32::Registry::KEY_WRITE) do |reg|
         reg['ForceV2', Win32::Registry::REG_DWORD] = 1
       end
@@ -38,6 +39,7 @@ module Yamatanooroti::WindowsConsoleSettings
         reg['DelegationTerminal', Win32::Registry::REG_SZ] = DelegationTerminalSetting[:conhost]
       end if @orig_console && @orig_terminal
     when "legacy-conhost"
+      puts "use conhost(legacy, conhostV1) for windows console"
       Win32::Registry::HKEY_CURRENT_USER.open('Console', Win32::Registry::KEY_WRITE) do |reg|
         reg['ForceV2', Win32::Registry::REG_DWORD] = 0
       end

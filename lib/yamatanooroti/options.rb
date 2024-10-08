@@ -15,6 +15,7 @@ class Yamatanooroti
 
     @default_wait = 0.01
     @default_timeout = 2.0
+    @windows = :conhost
     @show_console = false
     @close_console = :always
 
