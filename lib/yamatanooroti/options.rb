@@ -1,7 +1,8 @@
 class Yamatanooroti
   module Options
-    options = class << self
-      attr_reader :default_wait, :default_timeout, :windows, :show_console, :close_console
+    options = [:default_wait, :default_timeout, :windows, :show_console, :close_console]
+    self.singleton_class.instance_eval do
+      attr_reader(*options)
     end
 
     Accessor = Module.new do |mod|
