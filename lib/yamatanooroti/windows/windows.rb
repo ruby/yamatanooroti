@@ -28,8 +28,8 @@ module Yamatanooroti::WindowsConsoleSettings
   end
 
   Test::Unit.at_start do
-    case Yamatanooroti.options.windows.to_s
-    when "conhost"
+    case Yamatanooroti.options.windows
+    when :conhost
       puts "use conhost(classic, conhostV2) for windows console"
       Win32::Registry::HKEY_CURRENT_USER.open('Console', Win32::Registry::KEY_WRITE) do |reg|
         reg['ForceV2', Win32::Registry::REG_DWORD] = 1
@@ -38,7 +38,7 @@ module Yamatanooroti::WindowsConsoleSettings
         reg['DelegationConsole', Win32::Registry::REG_SZ] = DelegationConsoleSetting[:conhost]
         reg['DelegationTerminal', Win32::Registry::REG_SZ] = DelegationTerminalSetting[:conhost]
       end if @orig_console && @orig_terminal
-    when "legacy-conhost"
+    when :"legacy-conhost"
       puts "use conhost(legacy, conhostV1) for windows console"
       Win32::Registry::HKEY_CURRENT_USER.open('Console', Win32::Registry::KEY_WRITE) do |reg|
         reg['ForceV2', Win32::Registry::REG_DWORD] = 0
@@ -47,6 +47,10 @@ module Yamatanooroti::WindowsConsoleSettings
         reg['DelegationConsole', Win32::Registry::REG_SZ] = DelegationConsoleSetting[:conhost]
         reg['DelegationTerminal', Win32::Registry::REG_SZ] = DelegationTerminalSetting[:conhost]
       end if @orig_console && @orig_terminal
+    when :canary
+      prepare_terminal_canary
+    else
+      prepare_terminal_portable
     end
   end
 
@@ -58,6 +62,14 @@ module Yamatanooroti::WindowsConsoleSettings
       reg['DelegationConsole', Win32::Registry::REG_SZ] = @orig_console
       reg['DelegationTerminal', Win32::Registry::REG_SZ] = @orig_terminal
     end if @orig_console && @orig_terminal
+  end
+
+  def self.prepare_terminal_canary
+    puts "TODO: prepare_terminal_canary"
+  end
+
+  def self.prepare_terminal_portable
+    puts "TODO: prepare_terminal_portable"
   end
 end
 
@@ -301,7 +313,7 @@ module Yamatanooroti::WindowsTermMixin
         DL.set_console_screen_buffer_info_ex(conout,  view_h,  view_w, buffer_height)
         return :conhost
       else
-        DL.set_console_window_info(handle, view_h, view_w)
+        DL.set_console_window_info(conout, view_h, view_w)
         return :terminal
       end
     end

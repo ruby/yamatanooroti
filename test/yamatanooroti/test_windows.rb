@@ -18,7 +18,7 @@ class Yamatanooroti::TestWindowsSpecific < Yamatanooroti::TestCase
   if Yamatanooroti.win?
     def test_console_selection
       start_terminal(5, 30, ['ruby', 'bin/simple_repl'], startup_message: 'prompt>')
-      assert_equal(Yamatanooroti.options.windows, identify)
+      assert_equal(Yamatanooroti.options.terminal ? :terminal : Yamatanooroti.options.windows, identify)
     end
 
     def test_codepage_932
