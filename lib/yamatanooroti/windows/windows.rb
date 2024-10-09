@@ -1,5 +1,9 @@
 require 'stringio'
 require 'win32/registry'
+require 'tmpdir'
+require 'fileutils'
+require 'uri'
+require 'digest/sha2'
 
 module Yamatanooroti::WindowsConsoleSettings
   DelegationConsoleSetting = {
@@ -64,12 +68,67 @@ module Yamatanooroti::WindowsConsoleSettings
     end if @orig_console && @orig_terminal
   end
 
+  def self.tmpdir
+    if Yamatanooroti.options.terminal_workdir
+      dir = Yamatanooroti.options.terminal_workdir
+      FileUtils.mkdir_p(dir)
+    else
+      dir = nil
+      Thread.new do
+        Thread.current.abort_on_exception = true
+        Dir.tmpdir do |tmpdir|
+          dir = tmpdir
+          p dir
+          sleep
+        end
+      end
+      Thread.pass while dir == nil
+    end
+    return dir
+  end
+
   def self.prepare_terminal_canary
-    puts "TODO: prepare_terminal_canary"
+    header = `curl --head -sS -o NUL -L -w "%{url_effective}\n%header{ETag}\n%header{Content-Length}\n%header{Last-Modified}" https://aka.ms/terminal-canary-zip-x64`
+    url, etag, length, timestamp = *header.lines.map(&:chomp)
+    dir = tmpdir()
+    name = File.basename(URI.parse(url).path)
+    path = File.join(dir, "canary", etag, name)
+    if File.exist?(path)
+      if File.size(path) == length.to_i
+        puts "use existing #{path}"
+        return path
+      else
+        FileUtils.remove_entry(path)
+      end
+    else
+      if Dir.empty(dir)
+        puts "removing old canary zip"
+        Dir.entries.each { |olddir| FileUtils.remove_entry(olddir) }
+      end
+    end
+    FileUtils.mkdir_p(File.dirname(path))
+    system "curl #{$stdin.isatty ? "" : "-sS "}-L -o #{path} https://aka.ms/terminal-canary-zip-x64"
+    return path
   end
 
   def self.prepare_terminal_portable
-    puts "TODO: prepare_terminal_portable"
+    releases = Yamatanooroti::Options::WindowsTerminal::RELEASES
+    url = releases[Yamatanooroti.options.windows.to_sym][:url]
+    sha256 = releases[Yamatanooroti.options.windows.to_sym][:sha256]
+    dir = tmpdir()
+    name = File.basename(URI.parse(url).path)
+    path = File.join(dir, Yamatanooroti.options.windows, name)
+    if File.exist?(path)
+      if Digest::SHA256.new.file(path).hexdigest.upcase == sha256
+        puts "use existing #{path}"
+        return path
+      else
+        FileUtils.remove_entry(path)
+      end
+    end
+    FileUtils.mkdir_p(File.dirname(path))
+    system "curl #{$stdin.isatty ? "" : "-sS "}-L -o #{path} #{url}"
+    return path
   end
 end
 
