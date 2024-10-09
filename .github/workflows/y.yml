@@ -62,4 +62,4 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
       - name: rake test
         run: |
-          rake test TESTOPTS="--windows=${{ matrix.console }}"
+          rake test TESTOPTS="-v --windows=${{ matrix.console }}"

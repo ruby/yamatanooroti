@@ -20,6 +20,10 @@ module Yamatanooroti::WindowsTestCaseModule
     @terminal.codepage_success?
   end
 
+  def identify
+    @terminal.identify
+  end
+
   def start_terminal(height, width, command, wait: nil, timeout: nil, startup_message: nil, codepage: nil)
     @timeout = timeout || Yamatanooroti.options.default_timeout
     @wait = wait || Yamatanooroti.options.default_wait

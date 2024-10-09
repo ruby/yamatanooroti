@@ -124,6 +124,7 @@ module Yamatanooroti::WindowsDefinition
   SW_SHOWNOACTIVE = 4
   SW_SHOWMINNOACTIVE = 7
   LEFT_ALT_PRESSED = 0x0002
+  ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
 
   # BOOL CloseHandle(HANDLE hObject);
   extern 'BOOL CloseHandle(HANDLE);', :stdcall
@@ -152,6 +153,11 @@ module Yamatanooroti::WindowsDefinition
   extern 'BOOL GetConsoleScreenBufferInfoEx(HANDLE, PCONSOLE_SCREEN_BUFFER_INFOEX);', :stdcall
   # BOOL WINAPI SetConsoleScreenBufferInfoEx(HANDLE hConsoleOutput, PCONSOLE_SCREEN_BUFFER_INFOEX lpConsoleScreenBufferInfoEx);
   extern 'BOOL SetConsoleScreenBufferInfoEx(HANDLE, PCONSOLE_SCREEN_BUFFER_INFOEX);', :stdcall
+  # BOOL WINAPI GetConsoleMode(HANDLE hConsoleHandle, LPDWORD lpMode);
+  extern 'BOOL GetConsoleMode(HANDLE, LPDWORD);', :stdcall
+  # BOOL WINAPI SetConsoleMode(HANDLE hConsoleHandle, DWORD dwMode);
+  extern 'BOOL SetConsoleMode(HANDLE, DWORD);', :stdcall
+
 
   # BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);
   extern 'BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);', :stdcall
@@ -362,6 +368,18 @@ module Yamatanooroti::WindowsDefinition
     r = GetNumberOfConsoleInputEvents(handle, n)
     error_message(r, 'GetNumberOfConsoleInputEvents')
     return n.to_str.unpack1('L')
+  end
+
+  def get_console_mode(handle)
+    mode = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
+    mode[0, Fiddle::SIZEOF_DWORD] = "\0".b * Fiddle::SIZEOF_DWORD
+    GetConsoleMode(handle, mode)
+    # error_message(r, 'GetConsoleMode') # may be fail
+    mode.to_str.unpack1('L')
+  end
+
+  def set_console_mode(handle, mode)
+    0 != SetConsoleMode(handle, mode)
   end
 
   # Ctrl+C trap support

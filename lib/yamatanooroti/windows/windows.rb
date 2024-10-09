@@ -263,6 +263,50 @@ module Yamatanooroti::WindowsTermMixin
     @result || retrieve_screen
   end
 
+  # identify windows console
+  # conhost(legacy)
+  #   compatible with older windows
+  #   lacks newer features (VT sequence support)
+  # conhost(classic)
+  #   conhost with supports VT
+  # terminal
+  #   fully VT support
+  #   focused on modern features over compatibility 
+  #     can't access screen buffer outside of view
+  #     change winsize using win32api
+  def identify
+    attach_terminal do |conin, conout|
+      orig_mode = DL.get_console_mode(conout)
+      DL.set_console_mode(conout, orig_mode ^ DL::ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+      alt_mode = DL.get_console_mode(conout)
+      if ((orig_mode | alt_mode) & DL::ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0
+        # consolemode unchanged, ENABLE_VIRTUAL_TERMINAL_PROCESSING == 0
+        return :"legacy-conhost"
+      end
+      DL.set_console_mode(conout, orig_mode)
+
+      orig_buffer_info = DL.get_console_screen_buffer_info(conout)
+      view_w = orig_buffer_info.dwSize_X
+      view_h = orig_buffer_info.Bottom - orig_buffer_info.Top + 1
+      buffer_height = orig_buffer_info.dwSize_Y
+      if buffer_height !=  view_h
+        # buffer size != view size
+        return :conhost
+      end
+
+      DL.set_console_screen_buffer_info_ex(conout,  view_h,  view_w, buffer_height + 1)
+      alt_buffer_info = DL.get_console_screen_buffer_info(conout)
+      if alt_buffer_info.dwSize_Y == buffer_height + 1
+        # now screen buffer size can be diffrent to view size
+        DL.set_console_screen_buffer_info_ex(conout,  view_h,  view_w, buffer_height)
+        return :conhost
+      else
+        DL.set_console_window_info(handle, view_h, view_w)
+        return :terminal
+      end
+    end
+  end
+
   def check_interrupt
     raise_interrupt if DL.interrupted?
   end
