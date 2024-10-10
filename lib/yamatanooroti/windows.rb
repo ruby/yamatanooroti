@@ -34,7 +34,7 @@ module Yamatanooroti::WindowsTestCaseModule
 
     case startup_message
     when String
-      wait_startup_message { |message| message.start_with?(startup_message) }
+      wait_startup_message { |message| message.start_with?(startup_message.chars.each_slice(width).map { |l| l.join.rstrip }.join("\n")) }
     when Regexp
       wait_startup_message { |message| startup_message.match?(message) }
     end
