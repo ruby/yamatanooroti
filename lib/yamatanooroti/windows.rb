@@ -99,7 +99,7 @@ module Yamatanooroti::WindowsTestCaseModule
         if !Yamatanooroti.options.show_console ||
             Yamatanooroti.options.close_console == :always || 
             Yamatanooroti.options.close_console == :pass && passed?
-          @terminal.close_console
+          @terminal&.close_console
         end
       end
     end
