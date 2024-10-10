@@ -5,9 +5,9 @@ require 'io/console'
 require 'io/wait'
 
 module Yamatanooroti::VTermTestCaseModule
-  def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil)
-    @timeout = timeout
-    @wait = wait
+  def start_terminal(height, width, command, wait: nil, timeout: nil, startup_message: nil)
+    @timeout = timeout || Yamatanooroti.options.default_timeout
+    @wait = wait || Yamatanooroti.options.default_wait
     @result = nil
 
     @pty_output, @pty_input, @pid = PTY.spawn(*command)

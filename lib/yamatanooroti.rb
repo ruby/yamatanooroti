@@ -1,4 +1,5 @@
 require 'test/unit'
+require_relative 'yamatanooroti/options'
 
 class Yamatanooroti
   def self.load_vterm
