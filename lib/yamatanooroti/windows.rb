@@ -28,6 +28,11 @@ module Yamatanooroti::WindowsTestCaseModule
     @timeout = timeout || Yamatanooroti.options.default_timeout
     @wait = wait || Yamatanooroti.options.default_wait
     @result = nil
+    if @terminal
+      if !Yamatanooroti.options.show_console || Yamatanooroti.options.close_console != :never
+        @terminal.close_console
+      end
+    end
     @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait)
     @terminal.setup_cp(codepage) if codepage
     @terminal.launch(command)
