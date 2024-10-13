@@ -34,15 +34,6 @@ class Yamatanooroti
       end
     end
 
-    @default_wait = 0.01
-    @default_timeout = 2.0
-    @windows = :conhost
-    @conhost = true
-    @terminal = false
-    @terminal_workdir = nil
-    @show_console = nil
-    @close_console = :always
-
     module WindowsTerminal
       ALIAS = {
         stable: :"1.21",
@@ -79,12 +70,6 @@ class Yamatanooroti
           sha256: "F2B1539649D17752888D7944F97D6372F8D48EB1CEB024501DF8D8E9D3352F25"
         },
       }
-      @wt_path = nil
-
-      # `curl -L -O -s -w "%{url_effective}" https://aka.ms/terminal-canary-zip-x64`
-      # `curl --head -w "%header{Location}\n%header{Content-Length} %header{Last-Modified}" https://aka.ms/terminal-canary-zip-x64`
-      # `curl --head -L -w "%header{Location}\n%header{Content-Length} %header{Last-Modified}" https://aka.ms/terminal-canary-zip-x64`
-      # `curl --head -L -w "%{url_effective}\n%header{Location}\n%header{Content-Length}\n%header{Last-Modified}" https://aka.ms/terminal-canary-zip-x64`
 
       def self.interpret(name)
         if ALIAS.has_key?(name)
@@ -105,6 +90,14 @@ class Yamatanooroti
     CLOSE_WHEN = [:always, :pass, :never]
 
     ::Test::Unit::AutoRunner.setup_option do |autorunner, o|
+      @default_wait = 0.01
+      @default_timeout = 2.0
+      @windows = Yamatanooroti.win? ? :conhost : nil
+      @conhost = true
+      @terminal = false
+      @terminal_workdir = nil
+      @show_console = nil
+      @close_console = :always
 
       o.on_tail("yamatanooroti options")
       o.on_tail("--wait=#{@default_wait}", Float,

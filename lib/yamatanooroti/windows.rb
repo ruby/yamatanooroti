@@ -2,6 +2,7 @@ require 'test/unit'
 require_relative 'windows/windows-definition'
 require_relative 'windows/windows'
 require_relative 'windows/conhost'
+require_relative 'windows/terminal'
 
 module Yamatanooroti::WindowsTestCaseModule
   def write(str)
@@ -33,7 +34,11 @@ module Yamatanooroti::WindowsTestCaseModule
         @terminal.close_console
       end
     end
-    @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait)
+    if Yamatanooroti.options.conhost
+      @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait)
+    else
+      @terminal = Yamatanooroti::WindowsTerminalTerm.setup_console(height, width, @wait, @timeout)
+    end
     @terminal.setup_cp(codepage) if codepage
     @terminal.launch(command)
 
