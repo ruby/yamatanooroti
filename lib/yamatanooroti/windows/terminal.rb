@@ -30,7 +30,7 @@ class Yamatanooroti::WindowsTerminalTerm
   private def invoke_wt_process(command, marker, timeout)
     spawn(command)
     # wait for create console process complete
-    wait_until = Time.now + timeout
+    wait_until = Time.now + timeout + 3 # 2sec timeout seems to be too short
     marker_pid = loop do
       pid = pid_from_imagename(marker)
       break pid if pid

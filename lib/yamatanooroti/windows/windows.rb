@@ -139,6 +139,7 @@ module Yamatanooroti::WindowsConsoleSettings
           }
       JSON
     end
+    puts "use #{wt} for windows console"
     wt
   end
 
