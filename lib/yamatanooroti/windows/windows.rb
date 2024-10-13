@@ -17,6 +17,14 @@ module Yamatanooroti::WindowsConsoleSettings
     preview:  "{86633F1F-6454-40EC-89CE-DA4EBA977EE2}",
   }.freeze
 
+  def self.wt_exe
+    @wt_exe
+  end
+
+  def self.wt_wait
+    0
+  end
+
   begin
     Win32::Registry::HKEY_CURRENT_USER.open('Console') do |reg|
       @orig_conhost = reg['ForceV2']
@@ -52,9 +60,9 @@ module Yamatanooroti::WindowsConsoleSettings
         reg['DelegationTerminal', Win32::Registry::REG_SZ] = DelegationTerminalSetting[:conhost]
       end if @orig_console && @orig_terminal
     when :canary
-      prepare_terminal_canary
+      @wt_exe = extract_terminal(prepare_terminal_canary)
     else
-      prepare_terminal_portable
+      @wt_exe = extract_terminal(prepare_terminal_portable)
     end
   end
 
@@ -69,6 +77,7 @@ module Yamatanooroti::WindowsConsoleSettings
   end
 
   def self.tmpdir
+    @tmpdir if @tmpdir
     if Yamatanooroti.options.terminal_workdir
       dir = Yamatanooroti.options.terminal_workdir
       FileUtils.mkdir_p(dir)
@@ -84,15 +93,61 @@ module Yamatanooroti::WindowsConsoleSettings
       end
       Thread.pass while dir == nil
     end
-    return dir
+    return @tmpdir = dir
+  end
+
+  def self.extract_terminal(path)
+    tar = File.join(ENV['SystemRoot'], "system32", "tar.exe")
+    extract_dir = File.join(tmpdir, "wt")
+    FileUtils.remove_entry(extract_dir) if File.exist?(extract_dir)
+    FileUtils.mkdir_p(extract_dir)
+    puts "extracting #{File.basename(path)}"
+    system tar, "xf", path, "-C", extract_dir
+    wt = Dir["**/wt.exe", base: extract_dir]
+    raise "not found wt.exe. aborted." if wt.size < 1
+    raise "found wt.exe #{wt.size} times unexpectedly. aborted." if wt.size > 1
+    wt = File.join(extract_dir, wt[0])
+    wt_dir = File.dirname(wt)
+    portable_mark = File.join(wt_dir, ".portable")
+    open(portable_mark, "w") { |f| f.puts } unless File.exist?(portable_mark)
+    settings = File.join(wt_dir, "settings", "settings.json")
+    FileUtils.mkdir_p(File.dirname(settings))
+    open(settings, "wb") do |settings|
+      settings.write <<~'JSON'
+          {
+              "defaultProfile": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
+              "disableAnimations": true,
+              "profiles": 
+              {
+                  "defaults": 
+                  {
+                      "bellStyle": "none",
+                      "closeOnExit": "always"
+                  },
+                  "list": 
+                  [
+                      {
+                          "commandline": "%SystemRoot%\\System32\\cmd.exe",
+                          "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
+                          "name": "cmd.exe"
+                      }
+                  ]
+              },
+              "warning.confirmCloseAllTabs": false,
+              "warning.largePaste": false,
+              "warning.multiLinePaste": false
+          }
+      JSON
+    end
+    wt
   end
 
   def self.prepare_terminal_canary
-    header = `curl --head -sS -o NUL -L -w "%{url_effective}\n%header{ETag}\n%header{Content-Length}\n%header{Last-Modified}" https://aka.ms/terminal-canary-zip-x64`
+    dir = tmpdir
+    header = `curl --head -sS -o #{tmpdir}/header -L -w "%{url_effective}\n%header{ETag}\n%header{Content-Length}\n%header{Last-Modified}" https://aka.ms/terminal-canary-zip-x64`
     url, etag, length, timestamp = *header.lines.map(&:chomp)
-    dir = tmpdir()
     name = File.basename(URI.parse(url).path)
-    path = File.join(dir, "canary", etag, name)
+    path = File.join(dir, "wt_dists", "canary", etag, name)
     if File.exist?(path)
       if File.size(path) == length.to_i
         puts "use existing #{path}"
@@ -101,23 +156,23 @@ module Yamatanooroti::WindowsConsoleSettings
         FileUtils.remove_entry(path)
       end
     else
-      if Dir.empty(dir)
+      if Dir.empty?(dir)
         puts "removing old canary zip"
         Dir.entries.each { |olddir| FileUtils.remove_entry(olddir) }
       end
     end
     FileUtils.mkdir_p(File.dirname(path))
     system "curl #{$stdin.isatty ? "" : "-sS "}-L -o #{path} https://aka.ms/terminal-canary-zip-x64"
-    return path
+    path
   end
 
   def self.prepare_terminal_portable
     releases = Yamatanooroti::Options::WindowsTerminal::RELEASES
     url = releases[Yamatanooroti.options.windows.to_sym][:url]
     sha256 = releases[Yamatanooroti.options.windows.to_sym][:sha256]
-    dir = tmpdir()
+    dir = tmpdir
     name = File.basename(URI.parse(url).path)
-    path = File.join(dir, Yamatanooroti.options.windows, name)
+    path = File.join(dir, "wt_dists", Yamatanooroti.options.windows, name)
     if File.exist?(path)
       if Digest::SHA256.new.file(path).hexdigest.upcase == sha256
         puts "use existing #{path}"
@@ -128,7 +183,8 @@ module Yamatanooroti::WindowsConsoleSettings
     end
     FileUtils.mkdir_p(File.dirname(path))
     system "curl #{$stdin.isatty ? "" : "-sS "}-L -o #{path} #{url}"
-    return path
+    raise "not match windows terminal distribution zip sha256" unless Digest::SHA256.new.file(path).hexdigest.upcase == sha256
+    path
   end
 end
 
