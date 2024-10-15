@@ -124,6 +124,7 @@ module Yamatanooroti::WindowsDefinition
   SW_SHOWNOACTIVE = 4
   SW_SHOWMINNOACTIVE = 7
   LEFT_ALT_PRESSED = 0x0002
+  ENABLE_PROCESSED_INPUT = 0x0001
   ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
 
   # BOOL CloseHandle(HANDLE hObject);
@@ -185,6 +186,8 @@ module Yamatanooroti::WindowsDefinition
 
   # BOOL WINAPI SetConsoleCtrlHandler(PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
   extern 'BOOL SetConsoleCtrlHandler(void *, BOOL Add);', :stdcall
+  # BOOL WINAPI GenerateConsoleCtrlEvent(DWORD dwCtrlEvent, DWORD dwProcessGroupId);
+  extern 'BOOL GenerateConsoleCtrlEvent(DWORD, DWORD);', :stdcall
 
   private def error_message(r, method_name, exception: true)
     return if not r.zero?
@@ -380,6 +383,12 @@ module Yamatanooroti::WindowsDefinition
 
   def set_console_mode(handle, mode)
     0 != SetConsoleMode(handle, mode)
+  end
+
+  def generate_console_ctrl_event(event, pgrp)
+    r = GenerateConsoleCtrlEvent(event, pgrp)
+    error_message(r, 'GenerateConsoleCtrlEvent')
+    return r != 0
   end
 
   # Ctrl+C trap support

@@ -192,7 +192,7 @@ end
 module Yamatanooroti::WindowsTermMixin
   DL = Yamatanooroti::WindowsDefinition
 
-  CONSOLE_KEEPING_COMMAND = %q[ruby.exe --disable=gems -e sleep]
+  CONSOLE_KEEPING_COMMAND = %q[ruby.exe --disable=gems -e "Signal.trap(:INT, nil); sleep"]
   CONSOLE_MARKING_COMMAND = %q[findstr.exe yamatanooroti]
 
   private def attach_terminal(open = true)
@@ -321,20 +321,20 @@ module Yamatanooroti::WindowsTermMixin
 
   def launch(command)
     check_interrupt
-    attach_terminal do
+    attach_terminal(false) do
       @target = SubProcess.new(command.map{ |c| quote_command_arg(c) }.join(' '))
     end
   end
 
   def setup_cp(cp)
-    @codepage_success_p = attach_terminal { system("chcp #{Integer(cp)} > NUL") }
+    @codepage_success_p = attach_terminal(false) { system("chcp #{Integer(cp)} > NUL") }
   end
 
   def codepage_success?
     @codepage_success_p
   end
 
-  def write(str)
+  def do_write(str)
     check_interrupt
     codes = str.chars.map do |c|
       c = "\r" if c == "\n"
@@ -362,6 +362,24 @@ module Yamatanooroti::WindowsTermMixin
         break if n.nil?
         @target.sync
         break if @target.closed?
+      end
+    end
+  end
+
+  def write(str)
+    mode = attach_terminal { |conin, conout| DL.get_console_mode(conin) }
+    if 0 == (mode & DL::ENABLE_PROCESSED_INPUT)
+      do_write(str)
+    else
+      str.dup.force_encoding(Encoding::ASCII_8BIT).split(/(\C-c)/).each do |chunk|
+        if chunk == "\C-c"
+          attach_terminal(false) do
+            # generate Ctrl+C event to process on same console
+            DL.generate_console_ctrl_event(0, 0)
+          end
+        else
+          do_write(chunk.force_encoding(str.encoding)) if chunk != ""
+        end
       end
     end
   end
