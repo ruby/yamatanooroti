@@ -2,6 +2,30 @@ class Yamatanooroti::WindowsTerminalTerm
   include Yamatanooroti::WindowsTermMixin
 
   @@count = 0
+  @@cradle = {}
+
+  def call_spawn(command)
+    pid = spawn(command)
+    if t = Process.detach(pid)
+      @@cradle[pid] = t
+    end
+    pid
+  end
+
+  def kill_and_wait(pid)
+    return unless pid
+    t = @@cradle[pid]
+    begin
+      Process.kill(:KILL, pid)
+    rescue Errno::ESRCH # No such process
+    end
+    if t
+      if t.join(@timeout) == nil
+        puts "Caution: process #{pid} does not terminate in #{@timeout} seconds."
+      end
+      @@cradle.delete(pid)
+    end
+  end
 
   def get_size
     attach_terminal do |conin, conout|
@@ -27,10 +51,10 @@ class Yamatanooroti::WindowsTerminalTerm
     do_tasklist("WINDOWTITLE eq #{name}")
   end
 
-  private def invoke_wt_process(command, marker, timeout)
-    spawn(command)
+  private def invoke_wt_process(command, marker)
+    call_spawn(command)
     # wait for create console process complete
-    wait_until = Time.now + timeout + 3 # 2sec timeout seems to be too short
+    wait_until = Time.now + @timeout + 3 # 2sec timeout seems to be too short
     marker_pid = loop do
       pid = pid_from_imagename(marker)
       break pid if pid
@@ -46,7 +70,7 @@ class Yamatanooroti::WindowsTerminalTerm
     end
 
     keeper_pid = attach_terminal do
-      spawn(CONSOLE_KEEPING_COMMAND)
+      call_spawn(CONSOLE_KEEPING_COMMAND)
     end
     @console_process_id = keeper_pid
 
@@ -56,29 +80,29 @@ class Yamatanooroti::WindowsTerminalTerm
       sleep 0.01 * 2**n
     end
 
-    Process.kill(:KILL, marker_pid)
+    kill_and_wait(marker_pid)
     return keeper_pid
   end
 
-  def new_wt(rows, cols, timeout)
+  def new_wt(rows, cols)
     marker_command = CONSOLE_MARKING_COMMAND
 
     @wt_id = "yamaoro#{Process.pid}##{@@count}"
     @@count += 1
     command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe} -w #{@wt_id} --size #{cols},#{rows} nt --title #{@wt_id} #{marker_command}"
 
-    return invoke_wt_process(command, marker_command.split(" ").first, timeout)
+    return invoke_wt_process(command, marker_command.split(" ").first)
   end
 
-  def split_pane(div = 0.5, timeout)
+  def split_pane(div = 0.5)
     marker_command = CONSOLE_MARKING_COMMAND
 
     command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe}  -w #{@wt_id} sp -V --title #{@wt_id} -s #{div} #{marker_command}"
-    return invoke_wt_process(command, marker_command.split(" ").first, timeout)
+    return invoke_wt_process(command, marker_command.split(" ").first)
   end
 
   def close_pane
-    Process.kill(:KILL, @console_process_id)
+    kill_and_wait(@console_process_id)
     @console_process_id = @terminal_process_id
   end
 
@@ -107,12 +131,12 @@ class Yamatanooroti::WindowsTerminalTerm
     loop do
       w = dw = @@div_to_width[div]
       unless w
-        wt.split_pane(div/100.0, timeout)
+        wt.split_pane(div/100.0)
         size = wt.get_size
         w = @@div_to_width[div] = size[1]
       end
       if w == width
-        wt.split_pane(div/100.0, timeout) if dw
+        wt.split_pane(div/100.0) if dw
         @@width_to_div[width] = div
         return wt
       else
@@ -137,10 +161,11 @@ class Yamatanooroti::WindowsTerminalTerm
 
   def initialize(height, width, wait, timeout)
     @wait = wait
+    @timeout = timeout
     @result = nil
     @codepage_success_p = nil
 
-    @terminal_process_id = new_wt(height, width, timeout)
+    @terminal_process_id = new_wt(height, width)
   end
 
   def close
@@ -154,17 +179,8 @@ class Yamatanooroti::WindowsTerminalTerm
     if @target && !@target.closed?
       @target.close
     end
-    begin
-      Process.kill("KILL", @console_process_id) if @console_process_id
-    rescue Errno::ESRCH # No such process
-    ensure
-      begin
-        if @console_process_id != @terminal_process_id
-          Process.kill("KILL", @terminal_process_id)
-        end
-      rescue Errno::ESRCH # No such process
-      end
-      @console_process_id = @terminal_process_id = nil
-    end
+    kill_and_wait(@console_process_id) if @console_process_id
+    kill_and_wait(@terminal_process_id) if @console_process_id != @terminal_process_id
+    @console_process_id = @terminal_process_id = nil
   end
 end
