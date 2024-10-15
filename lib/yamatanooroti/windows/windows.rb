@@ -279,10 +279,7 @@ module Yamatanooroti::WindowsTermMixin
 
     def close
       unless closed?
-        begin
-          Process.kill("KILL", @pid)
-        rescue Errno::ESRCH # No such process
-        end
+        system("taskkill /PID #{@pid} /F /T", {[:out, :err] => "NUL"})
         @status = @mon.join.value.exitstatus
         sync
         @errin.close
