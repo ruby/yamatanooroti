@@ -77,18 +77,20 @@ module Yamatanooroti::WindowsConsoleSettings
   end
 
   def self.tmpdir
-    @tmpdir if @tmpdir
+    return @tmpdir if @tmpdir
+    dir = nil
     if Yamatanooroti.options.terminal_workdir
       dir = Yamatanooroti.options.terminal_workdir
       FileUtils.mkdir_p(dir)
     else
-      dir = nil
-      Thread.new do
+      @tmpdir_t = Thread.new do
         Thread.current.abort_on_exception = true
-        Dir.tmpdir do |tmpdir|
+        Dir.mktmpdir do |tmpdir|
           dir = tmpdir
           p dir
           sleep
+        ensure
+          sleep 0.5 # wait for terminate windows terminal
         end
       end
       Thread.pass while dir == nil
@@ -148,7 +150,7 @@ module Yamatanooroti::WindowsConsoleSettings
     header = `curl --head -sS -o #{tmpdir}/header -L -w "%{url_effective}\n%header{ETag}\n%header{Content-Length}\n%header{Last-Modified}" https://aka.ms/terminal-canary-zip-x64`
     url, etag, length, timestamp = *header.lines.map(&:chomp)
     name = File.basename(URI.parse(url).path)
-    path = File.join(dir, "wt_dists", "canary", etag, name)
+    path = File.join(dir, "wt_dists", "canary", etag.delete('"'), name)
     if File.exist?(path)
       if File.size(path) == length.to_i
         puts "use existing #{path}"
