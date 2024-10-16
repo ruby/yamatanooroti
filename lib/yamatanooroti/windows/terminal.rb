@@ -64,8 +64,13 @@ class Yamatanooroti::WindowsTerminalTerm
   private def invoke_wt_process(command, marker)
     call_spawn(command)
     # default timeout seems to be too short
-    marker_pid = with_timeout("Windows Terminal marker process detection failed.", @timeout + 5) do
-      pid_from_imagename(marker)
+    begin
+      marker_pid = with_timeout("Windows Terminal marker process detection failed.", @timeout + 5) do
+        pid_from_imagename(marker)
+      end
+    rescue => e
+      system "tasklist /FI \"SESSION ge 0\""
+      raise e
     end
     @console_process_id = marker_pid
 
