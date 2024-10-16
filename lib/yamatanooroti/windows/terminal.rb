@@ -69,7 +69,7 @@ class Yamatanooroti::WindowsTerminalTerm
         pid_from_imagename(marker)
       end
     rescue => e
-      system "tasklist /FI \"SESSION ge 0\""
+      puts `tasklist /FI "SESSION ge 0"`
       raise e
     end
     @console_process_id = marker_pid
