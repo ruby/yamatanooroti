@@ -51,22 +51,27 @@ class Yamatanooroti::WindowsTerminalTerm
     do_tasklist("WINDOWTITLE eq #{name}")
   end
 
+  private def with_timeout(timeout_message, timeout = @timeout, &block)
+    wait_until = Time.now + timeout
+    loop do
+      result = block.call
+      break result if result
+      raise timeout_message if wait_until < Time.now
+      sleep @wait
+    end
+  end
+
   private def invoke_wt_process(command, marker)
     call_spawn(command)
-    # wait for create console process complete
-    wait_until = Time.now + @timeout + 3 # 2sec timeout seems to be too short
-    marker_pid = loop do
-      pid = pid_from_imagename(marker)
-      break pid if pid
-      raise "Windows Terminal marker process detection failed." if wait_until < Time.now
-      sleep @wait
+    # default timeout seems to be too short
+    marker_pid = with_timeout("Windows Terminal marker process detection failed.", @timeout + 5) do
+      pid_from_imagename(marker)
     end
     @console_process_id = marker_pid
 
     # wait for console startup complete
-    8.times do |n|
-      break if attach_terminal { true }
-      sleep 0.01 * 2**n
+    with_timeout("Console process startup timed out.") do
+      attach_terminal { true }
     end
 
     keeper_pid = attach_terminal do
@@ -75,9 +80,8 @@ class Yamatanooroti::WindowsTerminalTerm
     @console_process_id = keeper_pid
 
     # wait for console keeping process startup complete
-    8.times do |n|
-      break if attach_terminal { true }
-      sleep 0.01 * 2**n
+    with_timeout("Console process startup timed out.") do
+      attach_terminal { true }
     end
 
     kill_and_wait(marker_pid)
