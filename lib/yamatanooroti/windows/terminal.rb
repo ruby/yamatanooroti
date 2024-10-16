@@ -133,21 +133,16 @@ class Yamatanooroti::WindowsTerminalTerm
     div = @@width_to_div[width]
     div ||= (width * 98 + (min_w - width) * 9) / (expanded_size - 5)
     loop do
-      w = dw = @@div_to_width[div]
-      unless w
-        wt.split_pane(div/100.0)
-        size = wt.get_size
-        w = @@div_to_width[div] = size[1]
-      end
+      wt.split_pane(div/100.0)
+      sleep Yamatanooroti::WindowsConsoleSettings.wt_wait
+      size = wt.get_size
+      w = size[1]
       if w == width
-        wt.split_pane(div/100.0) if dw
         @@width_to_div[width] = div
         return wt
       else
-        unless dw
-          wt.close_pane
-          sleep Yamatanooroti::WindowsConsoleSettings.wt_wait
-        end
+        wt.close_pane
+        sleep Yamatanooroti::WindowsConsoleSettings.wt_wait
         if w > width
           div -= 1
           if div <= 0
