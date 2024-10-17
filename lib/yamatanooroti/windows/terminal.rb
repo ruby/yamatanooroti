@@ -191,10 +191,11 @@ class Yamatanooroti::WindowsTerminalTerm
     @result ||= retrieve_screen if !DL.interrupted? && @console_process_id
   end
 
-  def close_console
+  def close_console(passed = nil)
     if @target && !@target.closed?
       @target.close
     end
+    puts get_size.then { "Windows Terminal max size: rows: #{_1}, columns: #{_2}" } if @terminal_process_id && passed == false
     kill_and_wait(@console_process_id) if @console_process_id
     kill_and_wait(@terminal_process_id) if @console_process_id != @terminal_process_id
     @console_process_id = @terminal_process_id = nil

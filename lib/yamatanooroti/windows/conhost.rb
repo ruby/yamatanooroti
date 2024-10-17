@@ -30,7 +30,7 @@ class Yamatanooroti::ConhostTerm
     @result ||= retrieve_screen if !DL.interrupted? && @console_process_id
   end
 
-  def close_console
+  def close_console(passed = nil)
     if @target && !@target.closed?
       @target.close
     end
