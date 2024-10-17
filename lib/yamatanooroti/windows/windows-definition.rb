@@ -313,7 +313,7 @@ module Yamatanooroti::WindowsDefinition
       startup_info.wShowWindow = SW_SHOWNOACTIVE
     else
       startup_info.dwFlags = STARTF_USESHOWWINDOW
-      startup_info.wShowWindow = Yamatanooroti.options.windows.to_s == "legacy-conhost" ? SW_SHOWMINNOACTIVE : SW_HIDE
+      startup_info.wShowWindow = Yamatanooroti.options.windows.to_s != "conhost" ? SW_SHOWMINNOACTIVE : SW_HIDE
     end
 
     restore_console_control_handler do

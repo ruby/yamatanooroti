@@ -119,28 +119,18 @@ class Yamatanooroti
         @conhost = CONHOST_TYPES.include?(type)
         @terminal = !@conhost
         @windows =  @conhost ? type : WindowsTerminal.interpret(type)
-        if @terminal
-          if @show_console == false
-            puts "Windows Terminal is always visible. --no-show-console is ignored."
-          end
-          @show_console = true
-        end
       end
 
       o.on_tail("--wt-dir=DIR", String,
                 "Specify Windows Terminal working dir.",
-                "Automatically determined if not specified and treated temporary.",
-                "DIR is treaded permanent if specified and download files are remains.") do |dir|
+                "Automatically determined if not specified.",
+                "DIR is treaded permanent if specified so download files are remains there.") do |dir|
         @terminal_workdir = dir
       end
 
       o.on_tail("--[no-]show-console",
                 "Show test ongoing console.") do |show|
-        if show == false and @terminal
-          puts "Windows Terminal is always visible. --no-show-console is ignored."
-        else
-          @show_console = show
-        end
+        @show_console = show
       end
 
       o.on_tail("--[no-]close-console[=COND]", CLOSE_WHEN,
