@@ -1,5 +1,6 @@
 require 'fiddle/import'
 require 'fiddle/types'
+class Yamatanooroti; end
 
 module Yamatanooroti::WindowsDefinition
   extend Fiddle::Importer
@@ -113,6 +114,10 @@ module Yamatanooroti::WindowsDefinition
     'DWORD dwControlKeyState'
   ]
 
+  STD_INPUT_HANDLE = -10
+  STD_OUTPUT_HANDLE = -11
+  STD_ERROR_HANDLE = -12
+
   STARTF_USESHOWWINDOW = 1
   CREATE_NEW_CONSOLE = 0x10
   CREATE_NEW_PROCESS_GROUP = 0x200
@@ -127,6 +132,8 @@ module Yamatanooroti::WindowsDefinition
   ENABLE_PROCESSED_INPUT = 0x0001
   ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
 
+  # HANDLE GetStdHandle(DWORD nStdHandle);
+  extern 'HANDLE GetStdHandle(DWORD);', :stdcall
   # BOOL CloseHandle(HANDLE hObject);
   extern 'BOOL CloseHandle(HANDLE);', :stdcall
 
@@ -325,6 +332,12 @@ module Yamatanooroti::WindowsDefinition
     return console_process_info.dwProcessId
   end
 
+  def get_std_handle(stdhandle)
+    fh = GetStdHandle(stdhandle)
+    error_message(0, name) if fh == INVALID_HANDLE_VALUE
+    fh
+  end
+
   def mb2wc(str)
     size = MultiByteToWideChar(65001, 0, str, str.bytesize, '', 0)
     converted_str = "\x00".b * (size * 2)
@@ -429,9 +442,32 @@ module Yamatanooroti::WindowsDefinition
     end
   end
 
-  Test::Unit.at_exit do
-    self.at_exit
+  if Object.const_defined?(:Test) && Test.const_defined?(:Unit)
+    Test::Unit.at_exit do
+      Yamatanooroti::WindowsDefinition.at_exit
+    end
   end
 
   extend self
+end
+
+if __FILE__ == $0
+  class Yamatanooroti
+    class << self
+      attr_reader :options
+    end
+    @options = Object.new
+    class << @options
+      attr_accessor :show_console, :windows
+    end
+    options.show_console = true
+    options.windows = :conhost
+  end
+
+  DL = Yamatanooroti::WindowsDefinition
+  cin = DL.get_std_handle(DL::STD_INPUT_HANDLE)
+  cout = DL.get_std_handle(DL::STD_OUTPUT_HANDLE)
+  cerr = DL.get_std_handle(DL::STD_ERROR_HANDLE)
+
+  binding.irb
 end
