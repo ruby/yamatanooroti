@@ -106,7 +106,7 @@ class Yamatanooroti::WindowsTerminalTerm
   def split_pane(div = 0.5)
     marker_command = CONSOLE_MARKING_COMMAND
 
-    command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe}  -w #{@wt_id} sp -V --title #{@wt_id} -s #{div} #{marker_command}"
+    command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe}  -w #{@wt_id} sp -V --title #{@wt_id} -s #{div} #{marker_command}; swap-pane previous"
     return invoke_wt_process(command, marker_command.split(" ").first)
   end
 
@@ -133,22 +133,24 @@ class Yamatanooroti::WindowsTerminalTerm
       end
     end
     min_w = @@minimum_width
-    expanded_size = min_w + 30
+    #expanded_size = min_w + 30 # for default font size
+    expanded_size = 101
     wt = self.new(height, expanded_size, wait, timeout)
     div = @@width_to_div[width]
-    div ||= (width * 98 + (min_w - width) * 9) / (expanded_size - 5)
+    #div ||= (width * 98 + (min_w - width) * 9) / (expanded_size - 5) # for default font size
+    div ||= (expanded_size - width) * 84 / expanded_size + 8
     loop do
       wt.split_pane(div/100.0)
       sleep Yamatanooroti::WindowsConsoleSettings.wt_wait
       size = wt.get_size
       w = size[1]
+      @@width_to_div[w] = div
       if w == width
-        @@width_to_div[width] = div
         return wt
       else
         wt.close_pane
         sleep Yamatanooroti::WindowsConsoleSettings.wt_wait
-        if w > width
+        if w < width
           div -= 1
           if div <= 0
             raise "Could not set Windows Terminal to size #{[height, width]}"
