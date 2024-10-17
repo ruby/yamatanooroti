@@ -124,7 +124,11 @@ module Yamatanooroti::WindowsConsoleSettings
                   "defaults": 
                   {
                       "bellStyle": "none",
-                      "closeOnExit": "always"
+                      "closeOnExit": "always",
+                      "font": 
+                      {
+                          "size": 9
+                      }
                   },
                   "list": 
                   [
