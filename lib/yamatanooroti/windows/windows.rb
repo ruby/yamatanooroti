@@ -64,6 +64,9 @@ module Yamatanooroti::WindowsConsoleSettings
     else
       @wt_exe = extract_terminal(prepare_terminal_portable)
     end
+    if @wt_exe
+      Yamatanooroti::WindowsTerminalTerm.diagnose_size_capability
+    end
   end
 
   Test::Unit.at_exit do
