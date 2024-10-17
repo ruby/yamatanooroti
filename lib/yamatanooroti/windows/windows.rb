@@ -330,7 +330,10 @@ module Yamatanooroti::WindowsTermMixin
   end
 
   def setup_cp(cp)
-    @codepage_success_p = attach_terminal(false) { system("chcp #{Integer(cp)} > NUL") }
+    @codepage_success_p = attach_terminal(false) do
+      system("chcp #{Integer(cp)} > NUL")
+      DL.get_console_codepage() == cp && DL.get_console_output_codepage() == cp
+    end
   end
 
   def codepage_success?

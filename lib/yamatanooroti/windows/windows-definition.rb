@@ -165,7 +165,14 @@ module Yamatanooroti::WindowsDefinition
   extern 'BOOL GetConsoleMode(HANDLE, LPDWORD);', :stdcall
   # BOOL WINAPI SetConsoleMode(HANDLE hConsoleHandle, DWORD dwMode);
   extern 'BOOL SetConsoleMode(HANDLE, DWORD);', :stdcall
-
+  # BOOL WINAPI SetConsoleCP(UINT wCodePageID);
+  extern 'BOOL SetConsoleCP(UINT);', :stdcall
+  # BOOL WINAPI SetConsoleOutputCP(UINT wCodePageID);
+  extern 'BOOL SetConsoleOutputCP(UINT);', :stdcall
+  # UINT WINAPI GetConsoleCP(void);
+  extern 'UINT GetConsoleCP(void);', :stdcall
+  # UINT WINAPI GetConsoleOutputCP(void);
+  extern 'UINT GetConsoleOutputCP(void);', :stdcall
 
   # BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);
   extern 'BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);', :stdcall
@@ -389,13 +396,31 @@ module Yamatanooroti::WindowsDefinition
   def get_console_mode(handle)
     mode = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     mode[0, Fiddle::SIZEOF_DWORD] = "\0".b * Fiddle::SIZEOF_DWORD
-    GetConsoleMode(handle, mode)
-    # error_message(r, 'GetConsoleMode') # may be fail
+    r = GetConsoleMode(handle, mode)
+    error_message(r, 'GetConsoleMode', exception: false)
     mode.to_str.unpack1('L')
   end
 
   def set_console_mode(handle, mode)
     0 != SetConsoleMode(handle, mode)
+  end
+
+  def set_console_codepage(cp)
+    r = SetConsoleCP(cp)
+    error_message(r, 'SetConsoleCP', exception: false)
+  end
+
+  def set_console_output_codepage(cp)
+    r = SetConsoleOutputCP(cp)
+    error_message(r, 'SetConsoleOutputCP', exception: false)
+  end
+
+  def get_console_codepage()
+    GetConsoleCP()
+  end
+
+  def get_console_output_codepage()
+    GetConsoleOutputCP()
   end
 
   def generate_console_ctrl_event(event, pgrp)
