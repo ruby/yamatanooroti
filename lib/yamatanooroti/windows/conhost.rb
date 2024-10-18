@@ -10,7 +10,7 @@ class Yamatanooroti::ConhostTerm
     @result = nil
     @codepage_success_p = nil
 
-    @console_process_id = DL.create_console(CONSOLE_KEEPING_COMMAND.sub("NAME", name))
+    @console_process_id = DL.create_console(CONSOLE_KEEPING_COMMAND.sub("NAME", name), show_console_param())
 
     # wait for console startup complete
     8.times do |n|

@@ -62,7 +62,7 @@ class Yamatanooroti::WindowsTerminalTerm
   end
 
   private def invoke_wt_process(command, marker, keeper_name)
-    DL.create_console(command)
+    DL.create_console(command, show_console_param())
     # default timeout seems to be too short
     begin
       marker_pid = with_timeout("Windows Terminal marker process detection failed.", @timeout + 5) do

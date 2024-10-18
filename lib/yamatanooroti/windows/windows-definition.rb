@@ -324,7 +324,7 @@ module Yamatanooroti::WindowsDefinition
     }
   }
 
-  def create_console(command)
+  def create_console(command, show = SW_SHOWNORMAL)
     converted_command = mb2wc("#{command}\0")
     console_process_info = PROCESS_INFORMATION.malloc(FREE)
     console_process_info.to_ptr[0, PROCESS_INFORMATION.size] = "\0".b * PROCESS_INFORMATION.size
@@ -332,9 +332,7 @@ module Yamatanooroti::WindowsDefinition
     startup_info.to_ptr[0, STARTUPINFOW.size] = "\0".b * STARTUPINFOW.size
     startup_info.cb = STARTUPINFOW.size
     startup_info.dwFlags = STARTF_USESHOWWINDOW
-    startup_info.wShowWindow =
-      (SHOWWINDOW_MAP[Yamatanooroti.options.windows] || SHOWWINDOW_MAP[:terminal])
-      .fetch(Yamatanooroti.options.show_console ? :show : :hide)
+    startup_info.wShowWindow = show
 
     restore_console_control_handler do
       r = CreateProcessW(
@@ -490,22 +488,11 @@ module Yamatanooroti::WindowsDefinition
 end
 
 if __FILE__ == $0
-  class Yamatanooroti
-    class << self
-      attr_reader :options
-    end
-    @options = Object.new
-    class << @options
-      attr_accessor :show_console, :windows
-    end
-    options.show_console = true
-    options.windows = :conhost
-  end
-
   DL = Yamatanooroti::WindowsDefinition
   cin = DL.get_std_handle(DL::STD_INPUT_HANDLE)
   cout = DL.get_std_handle(DL::STD_OUTPUT_HANDLE)
   cerr = DL.get_std_handle(DL::STD_ERROR_HANDLE)
 
   binding.irb
+  [cin, cout, cerr]
 end

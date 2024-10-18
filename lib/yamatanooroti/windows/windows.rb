@@ -207,6 +207,11 @@ module Yamatanooroti::WindowsTermMixin
   CONSOLE_KEEPING_COMMAND = %q[ruby.exe --disable=gems -e "Signal.trap(:INT, nil); sleep; #NAME"]
   CONSOLE_MARKING_COMMAND = %q[findstr.exe yamatanooroti]
 
+  private def show_console_param
+    map = DL::SHOWWINDOW_MAP[Yamatanooroti.options.windows] || DL::SHOWWINDOW_MAP[:terminal]
+    map.fetch(Yamatanooroti.options.show_console ? :show : :hide)
+  end
+
   private def attach_terminal(open = true)
     stderr = $stderr
     $stderr = StringIO.new
