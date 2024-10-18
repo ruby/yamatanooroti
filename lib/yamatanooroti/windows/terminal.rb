@@ -235,14 +235,15 @@ class Yamatanooroti::WindowsTerminalTerm
 
   def self.diagnose_size_capability
     wt = self.new(999, 999, 0.01, 5.0)
-    @@max_size = wt.get_size
-    @@max_size = [[@@max_size[0], 60].min, [@@max_size[1], 200].min]
-    puts @@max_size.then { "Windows Terminal maximum size: rows: #{_1}, columns: #{_2}" }
-    wt.close_console
+    max_size = wt.get_size
+    @@max_size = [[max_size[0], 60].min, [max_size[1], 200].min]
+    puts max_size.then { "Windows Terminal maximum size: rows: #{_1}, columns: #{_2}" }
+    wt.close!
     wt = self.new(2, 2, 0.01, 5.0)
-    @@min_size = wt.get_size
-    puts @@min_size.then { "Windows Terminal smallest size: rows: #{_1}, columns: #{_2}" }
-    wt.close_console
+    min_size = @@min_size = wt.get_size
+    puts min_size.then { "Windows Terminal smallest size: rows: #{_1}, columns: #{_2}" }
+    wt.close!
+    puts @@max_size.then { "Use test window size: rows: #{_1}, columns: #{_2}" }
   end
 
   def close
