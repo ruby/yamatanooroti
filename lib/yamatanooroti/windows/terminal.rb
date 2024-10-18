@@ -61,7 +61,7 @@ class Yamatanooroti::WindowsTerminalTerm
     end
   end
 
-  private def invoke_wt_process(command, marker)
+  private def invoke_wt_process(command, marker, keeper_name)
     DL.create_console(command)
     # default timeout seems to be too short
     begin
@@ -69,7 +69,7 @@ class Yamatanooroti::WindowsTerminalTerm
         pid_from_imagename(marker)
       end
     rescue => e
-      puts `tasklist /FI "SESSION ge 0"`
+      # puts `tasklist /FI "SESSION ge 0"`
       raise e
     end
     @console_process_id = marker_pid
@@ -80,7 +80,7 @@ class Yamatanooroti::WindowsTerminalTerm
     end
 
     keeper_pid = attach_terminal do
-      call_spawn(CONSOLE_KEEPING_COMMAND)
+      call_spawn(CONSOLE_KEEPING_COMMAND.sub("NAME", keeper_name))
     end
     @console_process_id = keeper_pid
 
@@ -100,69 +100,128 @@ class Yamatanooroti::WindowsTerminalTerm
     @@count += 1
     command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe} -w #{@wt_id} --size #{cols},#{rows} nt --title #{@wt_id} #{marker_command}"
 
-    return invoke_wt_process(command, marker_command.split(" ").first)
+    return invoke_wt_process(command, marker_command.split(" ").first, "new_wt")
   end
 
-  def split_pane(div = 0.5)
+  def split_pane(div = 0.5, splitter: :v, name: nil)
     marker_command = CONSOLE_MARKING_COMMAND
 
-    command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe}  -w #{@wt_id} sp -V --title #{@wt_id} -s #{div} #{marker_command}; swap-pane previous"
-    return invoke_wt_process(command, marker_command.split(" ").first)
+    command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe} " \
+              "-w #{@wt_id} " \
+              "move-focus first; " \
+              "sp #{splitter == :v ? "-V" : "-H"} "\
+              "--title #{name || @wt_id} " \
+              "-s #{div} " \
+              "#{marker_command}"
+    pid = invoke_wt_process(command, marker_command.split(" ").first, "split_pane")
+    @process_ids.push pid
+    @console_process_id = @process_ids[0]
+  end
+
+  def move_focus(direction)
+    command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe} " \
+              "-w #{@wt_id} " \
+              "move-pane #{direction}"
+    system(command)
+  end
+
+  def new_tab
+    marker_command = CONSOLE_MARKING_COMMAND
+
+    command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe} " \
+              "-w #{@wt_id} " \
+              "new-tab " \
+              "#{marker_command}"
+    invoke_wt_process(command, marker_command.split(" ").first, "new_tab")
   end
 
   def close_pane
-    kill_and_wait(@console_process_id)
-    @console_process_id = @terminal_process_id
+    kill_and_wait(@process_ids.pop)
   end
 
-  @@minimum_width = nil
-  @@div_to_width = {}
-  @@width_to_div = {}
+  class List
+    def initialize(total)
+      @total = total
+      @div_to_x = {}
+      @x_to_div = {}
+    end
 
-  def self.setup_console(height, width, wait, timeout)
-    if @@minimum_width.nil? || @@minimum_width <= width
-      wt = self.new(height, width, wait, timeout)
-    end
-    if wt
-      size = wt.get_size
-      if size == [height, width]
-        return wt 
-      else
-        @@minimum_width = size[1]
-        wt.close_console
-      end
-    end
-    min_w = @@minimum_width
-    #expanded_size = min_w + 30 # for default font size
-    expanded_size = 101
-    wt = self.new(height, expanded_size, wait, timeout)
-    div = @@width_to_div[width]
-    #div ||= (width * 98 + (min_w - width) * 9) / (expanded_size - 5) # for default font size
-    div ||= (expanded_size - width) * 84 / expanded_size + 8
-    loop do
-      wt.split_pane(div/100.0)
-      sleep Yamatanooroti::WindowsConsoleSettings.wt_wait
-      size = wt.get_size
-      w = size[1]
-      @@width_to_div[w] = div
-      if w == width
-        return wt
-      else
-        wt.close_pane
-        sleep Yamatanooroti::WindowsConsoleSettings.wt_wait
-        if w < width
+    def search_div(x, &block)
+      denominator = 100
+      div, denominator = @x_to_div[x] if @x_to_div[x]
+      div ||= (@total - x) * (denominator * 95 / 100) / @total + denominator * 4 / 100
+      loop do
+        # STDOUT.write "target: #{x} total: #{@total} div: #{div.to_f / denominator}"
+        result = block.call(div.to_f / denominator)
+        # puts " result: #{result}"
+        @div_to_x[div.to_f / denominator] = result
+        @x_to_div[x] = [div, denominator]
+        return result if result == x
+        if result < x
           div -= 1
-          if div <= 0
-            raise "Could not set Windows Terminal to size #{[height, width]}"
+          return nil if div <= 0
+          if @div_to_x[div.to_f / denominator] && @div_to_x[div.to_f / denominator] != x
+            div = div * 10 + 5
+            denominator *= 10
           end
         else
           div += 1
-          if div >= 100
-            raise "Could not set Windows Terminal to size #{[height, width]}"
+          return nil if div >= denominator
+          if @div_to_x[div.to_f / denominator] && @div_to_x[div.to_f / denominator] != x
+            div = div * 10 - 5
+            denominator *= 10
           end
         end
       end
     end
+  end
+
+  @@mother_wt = nil
+  @@div_to_width = {}
+  @@width_to_div = {}
+
+  # raise "Could not set Windows Terminal to size #{[height, width]}"
+
+  def self.setup_console(height, width, wait, timeout, name)
+    if @@mother_wt == nil
+      @@mother_wt = self.new(*@@max_size, wait, timeout)
+      @@hsplit_info = List.new(@@max_size[0])
+      @@vsplit_info = List.new(@@max_size[1])
+    end
+    mother_height = @@max_size[0]
+    mother_width = @@max_size[1]
+
+    if height > mother_height
+      raise "console height #{height} grater than maximum(#{mother_height})"
+    end
+    if width > mother_width
+      raise "console width #{width} grater than maximum(#{mother_width})"
+    end
+
+    if height != mother_height
+      result_h = @@hsplit_info.search_div(height) do |div|
+        @@mother_wt.split_pane(div, splitter: :h, name: name)
+        @@mother_wt.move_focus("first")
+        h = @@mother_wt.get_size[0]
+        @@mother_wt.close_pane if h != height
+        h
+      end
+      raise "console height deviding to #{height} failed" if !result_h
+    end
+
+    if width != mother_width
+      result_w = @@vsplit_info.search_div(width) do |div|
+        @@mother_wt.split_pane(div, splitter: :v, name: name)
+        @@mother_wt.move_focus("first")
+        @@mother_wt.get_size[1]
+        w = @@mother_wt.get_size[1]
+        @@mother_wt.close_pane if w != width
+        w
+      end
+      raise "console widtht deviding to #{width} failed" if !result_w
+    end
+
+    return @@mother_wt
   end
 
   def initialize(height, width, wait, timeout)
@@ -171,7 +230,7 @@ class Yamatanooroti::WindowsTerminalTerm
     @result = nil
     @codepage_success_p = nil
 
-    @terminal_process_id = new_wt(height, width)
+    @process_ids = [new_wt(height, width)]
   end
 
   def self.diagnose_size_capability
@@ -193,13 +252,31 @@ class Yamatanooroti::WindowsTerminalTerm
     @result ||= retrieve_screen if !DL.interrupted? && @console_process_id
   end
 
-  def close_console(passed = nil)
-    if @target && !@target.closed?
-      @target.close
+  def close_console(need_to_close = true)
+    nt = new_tab()
+    if need_to_close && @process_ids
+      if @target && !@target.closed?
+        @target.close
+      end
+      while @process_ids.size > 0
+        kill_and_wait(@process_ids.pop)
+      end
     end
-    puts get_size.then { "Windows Terminal max size: rows: #{_1}, columns: #{_2}" } if @terminal_process_id && passed == false
-    kill_and_wait(@console_process_id) if @console_process_id
-    kill_and_wait(@terminal_process_id) if @console_process_id != @terminal_process_id
-    @console_process_id = @terminal_process_id = nil
+    @process_ids = [@console_process_id = nt]
+    @result = nil
+  end
+
+  def close!
+    if @process_ids
+      while @process_ids.size > 0
+        kill_and_wait(@process_ids.pop)
+      end
+    end
+    @@mother_wt = nil
+    @process_ids = @console_process_id = nil
+  end
+
+  Test::Unit.at_exit do
+    @@mother_wt&.close!
   end
 end

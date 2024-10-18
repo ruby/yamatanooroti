@@ -35,9 +35,9 @@ module Yamatanooroti::WindowsTestCaseModule
       end
     end
     if Yamatanooroti.options.conhost
-      @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait)
+      @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait, name)
     else
-      @terminal = Yamatanooroti::WindowsTerminalTerm.setup_console(height, width, @wait, @timeout)
+      @terminal = Yamatanooroti::WindowsTerminalTerm.setup_console(height, width, @wait, @timeout, name)
     end
     @terminal.setup_cp(codepage) if codepage
     @terminal.launch(command)
@@ -106,11 +106,11 @@ module Yamatanooroti::WindowsTestCaseModule
   def self.included(cls)
     cls.instance_exec do
       teardown do
-        if !Yamatanooroti.options.show_console ||
-            Yamatanooroti.options.close_console == :always || 
-            Yamatanooroti.options.close_console == :pass && passed?
-          @terminal&.close_console(passed?)
-        end
+        @terminal&.close_console(
+          !Yamatanooroti.options.show_console ||
+           Yamatanooroti.options.close_console == :always || 
+           Yamatanooroti.options.close_console == :pass && passed?
+        )
       end
     end
   end

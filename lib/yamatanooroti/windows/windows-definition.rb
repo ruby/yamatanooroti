@@ -128,6 +128,7 @@ module Yamatanooroti::WindowsDefinition
   SW_HIDE = 0
   SW_SHOWNOACTIVE = 4
   SW_SHOWMINNOACTIVE = 7
+  SW_SHOWNA = 8
   LEFT_ALT_PRESSED = 0x0002
   ENABLE_PROCESSED_INPUT = 0x0001
   ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
@@ -308,6 +309,21 @@ module Yamatanooroti::WindowsDefinition
     return r != 0
   end
 
+  SHOWWINDOW_MAP = {
+    conhost: {
+      show: SW_SHOWNOACTIVE,
+      hide: SW_HIDE,
+    },
+    "legacy-conhost": {
+      show: SW_SHOWNOACTIVE,
+      hide: SW_SHOWMINNOACTIVE,
+    },
+    "terminal": {
+      show: SW_SHOWNOACTIVE,
+      hide: SW_HIDE,
+    }
+  }
+
   def create_console(command)
     converted_command = mb2wc("#{command}\0")
     console_process_info = PROCESS_INFORMATION.malloc(FREE)
@@ -315,13 +331,10 @@ module Yamatanooroti::WindowsDefinition
     startup_info = STARTUPINFOW.malloc(FREE)
     startup_info.to_ptr[0, STARTUPINFOW.size] = "\0".b * STARTUPINFOW.size
     startup_info.cb = STARTUPINFOW.size
-    if Yamatanooroti.options.show_console
-      startup_info.dwFlags = STARTF_USESHOWWINDOW
-      startup_info.wShowWindow = SW_SHOWNOACTIVE
-    else
-      startup_info.dwFlags = STARTF_USESHOWWINDOW
-      startup_info.wShowWindow = Yamatanooroti.options.windows.to_s != "conhost" ? SW_SHOWMINNOACTIVE : SW_HIDE
-    end
+    startup_info.dwFlags = STARTF_USESHOWWINDOW
+    startup_info.wShowWindow =
+      (SHOWWINDOW_MAP[Yamatanooroti.options.windows] || SHOWWINDOW_MAP[:terminal])
+      .fetch(Yamatanooroti.options.show_console ? :show : :hide)
 
     restore_console_control_handler do
       r = CreateProcessW(
@@ -446,7 +459,7 @@ module Yamatanooroti::WindowsDefinition
     end
   end
 
-  @interrupt_monitor_pid = spawn("ruby --disable=gems -e sleep", [:out, :err] => "NUL")
+  @interrupt_monitor_pid = spawn("ruby --disable=gems -e sleep #InterruptMonitor", [:out, :err] => "NUL")
   @interrupt_monitor = Process.detach(@interrupt_monitor_pid)
   ignore_console_control_handler
   @interrupted_p = nil

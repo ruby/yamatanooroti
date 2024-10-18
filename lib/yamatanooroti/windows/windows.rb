@@ -90,7 +90,6 @@ module Yamatanooroti::WindowsConsoleSettings
         Thread.current.abort_on_exception = true
         Dir.mktmpdir do |tmpdir|
           dir = tmpdir
-          p dir
           sleep
         ensure
           sleep 0.5 # wait for terminate windows terminal
@@ -122,6 +121,7 @@ module Yamatanooroti::WindowsConsoleSettings
           {
               "defaultProfile": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
               "disableAnimations": true,
+              "minimizeToNotificationArea": true,
               "profiles": 
               {
                   "defaults": 
@@ -131,7 +131,9 @@ module Yamatanooroti::WindowsConsoleSettings
                       "font": 
                       {
                           "size": 9
-                      }
+                      },
+                      "padding": "0",
+                      "scrollbarState": "always"
                   },
                   "list": 
                   [
@@ -142,6 +144,7 @@ module Yamatanooroti::WindowsConsoleSettings
                       }
                   ]
               },
+              "showTabsInTitlebar": false,
               "warning.confirmCloseAllTabs": false,
               "warning.largePaste": false,
               "warning.multiLinePaste": false
@@ -201,7 +204,7 @@ end
 module Yamatanooroti::WindowsTermMixin
   DL = Yamatanooroti::WindowsDefinition
 
-  CONSOLE_KEEPING_COMMAND = %q[ruby.exe --disable=gems -e "Signal.trap(:INT, nil); sleep"]
+  CONSOLE_KEEPING_COMMAND = %q[ruby.exe --disable=gems -e "Signal.trap(:INT, nil); sleep; #NAME"]
   CONSOLE_MARKING_COMMAND = %q[findstr.exe yamatanooroti]
 
   private def attach_terminal(open = true)
@@ -397,21 +400,18 @@ module Yamatanooroti::WindowsTermMixin
     return @result if @result
     check_interrupt
     @target.sync
-    top, bottom, width = attach_terminal do |conin, conout|
+    attach_terminal do |conin, conout|
       csbi = DL.get_console_screen_buffer_info(conout)
-      if top_of_buffer
+      top, bottom, width = if top_of_buffer
         [0, csbi.Bottom, csbi.Right - csbi.Left + 1]
       else
         [csbi.Top, csbi.Bottom, csbi.Right - csbi.Left + 1]
       end
-    end
 
-    lines = attach_terminal do |conin, conout|
-      (top..bottom).map do |y|
+      return (top..bottom).map do |y|
         DL.read_console_output(conout, y, width) || ""
       end
     end
-    lines
   end
 
   def result
@@ -467,7 +467,7 @@ module Yamatanooroti::WindowsTermMixin
   end
 
   def raise_interrupt
-    close_console
+    close!
     DL.at_exit
     raise Interrupt
   end
