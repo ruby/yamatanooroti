@@ -27,14 +27,14 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
   end
 
   def test_assert_screen_retries
-    write("sleep 1\n")
+    write("sleep 1 && 1\n")
     assert_screen(/=> 1\nprompt>/)
-    assert_equal(['prompt> sleep 1', '=> 1', 'prompt>', '', ''], result)
+    assert_equal(['prompt> sleep 1 && 1', '=> 1', 'prompt>', '', ''], result)
     close
   end
 
   def test_assert_screen_timeout
-    write("sleep 3\n")
+    write("sleep 3 && 3\n")
     assert_raise do
       assert_screen(/=> 3\nprompt>/)
     end
