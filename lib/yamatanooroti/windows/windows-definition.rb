@@ -220,8 +220,11 @@ module Yamatanooroti::WindowsDefinition
     if n > 0
       str = wc2mb(string.ptr[0, n * 2])
       LocalFree(string)
-      msg = "ERROR(#{method_name}): #{err.to_s}: #{str}"
+    else
+      msgerr = Fiddle.win32_last_error
+      str = "error description unknow (FormatMessageW failed with #{msgerr})"
     end
+    msg = "ERROR(#{method_name}): #{err}: #{str}"
     if exception
       raise msg
     else
