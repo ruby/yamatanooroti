@@ -14,7 +14,7 @@ class Yamatanooroti::ConhostTerm
 
     # wait for console startup complete
     8.times do |n|
-      break if attach_terminal { true }
+      break if attach_terminal(open: false, exception: false) { true }
       sleep 0.01 * 2**n
     end
 

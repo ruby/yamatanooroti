@@ -76,21 +76,22 @@ class Yamatanooroti::WindowsTerminalTerm
 
     # wait for console startup complete
     with_timeout("Console process startup timed out.") do
-      attach_terminal { true }
+      attach_terminal(open: false, exception: false) { true }
     end
 
-    keeper_pid = attach_terminal do
+    keeper_pid = attach_terminal(open: false) do
       call_spawn(CONSOLE_KEEPING_COMMAND.sub("NAME", keeper_name))
     end
     @console_process_id = keeper_pid
 
     # wait for console keeping process startup complete
     with_timeout("Console process startup timed out.") do
-      attach_terminal { true }
+      attach_terminal(open: false, exception: false) { true }
     end
 
-    kill_and_wait(marker_pid)
     return keeper_pid
+  ensure
+    kill_and_wait(marker_pid) if marker_pid
   end
 
   def new_wt(rows, cols)
@@ -213,7 +214,6 @@ class Yamatanooroti::WindowsTerminalTerm
       result_w = @@vsplit_info.search_div(width) do |div|
         @@mother_wt.split_pane(div, splitter: :v, name: name)
         @@mother_wt.move_focus("first")
-        @@mother_wt.get_size[1]
         w = @@mother_wt.get_size[1]
         @@mother_wt.close_pane if w != width
         w

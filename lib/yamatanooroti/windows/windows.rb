@@ -212,7 +212,7 @@ module Yamatanooroti::WindowsTermMixin
     map.fetch(Yamatanooroti.options.show_console ? :show : :hide)
   end
 
-  private def attach_terminal(open = true)
+  private def attach_terminal(open: true, exception: true)
     stderr = $stderr
     $stderr = StringIO.new
 
@@ -220,15 +220,13 @@ module Yamatanooroti::WindowsTermMixin
     check_interrupt
     DL.free_console
     # this can be fail while new process is starting
-    r = DL.attach_console(@console_process_id, maybe_fail: true)
+    r = DL.attach_console(@console_process_id, maybe_fail: !exception)
     return nil unless r
 
     if open
+      # if error occurred, causes exception regardless of exception: false
       conin = DL.create_console_file_handle("conin$")
-      return nil if conin == DL::INVALID_HANDLE_VALUE
-
       conout = DL.create_console_file_handle("conout$")
-      return nil if conout == DL::INVALID_HANDLE_VALUE
     end
 
     yield(conin, conout)
@@ -335,13 +333,13 @@ module Yamatanooroti::WindowsTermMixin
 
   def launch(command)
     check_interrupt
-    attach_terminal(false) do
+    attach_terminal(open: false) do
       @target = SubProcess.new(command.map{ |c| quote_command_arg(c) }.join(' '))
     end
   end
 
   def setup_cp(cp)
-    @codepage_success_p = attach_terminal(false) do
+    @codepage_success_p = attach_terminal(open: false) do
       system("chcp #{Integer(cp)} > NUL")
       DL.get_console_codepage() == cp && DL.get_console_output_codepage() == cp
     end
@@ -390,7 +388,7 @@ module Yamatanooroti::WindowsTermMixin
     else
       str.dup.force_encoding(Encoding::ASCII_8BIT).split(/(\C-c)/).each do |chunk|
         if chunk == "\C-c"
-          attach_terminal(false) do
+          attach_terminal(open: false) do
             # generate Ctrl+C event to process on same console
             DL.generate_console_ctrl_event(0, 0)
           end
