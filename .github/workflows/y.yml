@@ -43,6 +43,7 @@ jobs:
           bundle install
           bundle exec rake test
   windows-yamatanooroti:
+    needs: ruby-versions
     name: >-
       ${{ matrix.os }} ${{ matrix.ruby }} ${{ matrix.console }}
     runs-on: ${{ matrix.os }}
@@ -50,7 +51,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ windows-2019, windows-2022 ]
-        ruby: [ 3.3, mingw ]
+        ruby: ${{ fromJson(needs.ruby-versions.outputs.versions) }}
         console: [ conhost, legacy-conhost, 1.21, 1.22preview, canary ]
         exclude:
           - console: 1.21
@@ -70,4 +71,5 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
       - name: rake test
         run: |
-          rake test TESTOPTS="-v --wt_dir=./tmp --windows=${{ matrix.console }}"
+          bundle install
+          bundle exec rake test TESTOPTS="-v --wt_dir=./tmp --windows=${{ matrix.console }}"
