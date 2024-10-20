@@ -381,6 +381,7 @@ module Yamatanooroti::WindowsTermMixin
         end
       end
     end
+    @wrote_and_not_yet_waited = true
   end
 
   def retrieve_screen(top_of_buffer: false)
@@ -403,6 +404,24 @@ module Yamatanooroti::WindowsTermMixin
 
   def result
     @result || retrieve_screen
+  end
+
+  def close
+    if !@result && @console_process_id
+      sleep @timeout if @wrote_and_not_yet_waited # wait a long. avoid write();close() sequence
+    end
+    if @target && !@target.closed?
+      @target.close
+    end
+    if !DL.interrupted? && @console_process_id
+      @result = retrieve_screen
+    end
+    @result ||= ""
+  end
+
+  def sleep_wait
+    sleep @wait
+    @wrote_and_not_yet_waited = false
   end
 
   # identify windows console

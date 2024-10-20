@@ -1,14 +1,16 @@
 class Yamatanooroti::ConhostTerm
   include Yamatanooroti::WindowsTermMixin
 
-  def self.setup_console(height, width, wait, name)
-    new(height, width, wait, name)
+  def self.setup_console(height, width, wait, timeout, name)
+    new(height, width, wait, timeout, name)
   end
 
-  def initialize(height, width, wait, name)
+  def initialize(height, width, wait, timeout, name)
     @wait = wait
+    @timeout = timeout
     @result = nil
     @codepage_success_p = nil
+    @wrote_and_not_yet_waited = false
 
     @console_process_id = DL.create_console(CONSOLE_KEEPING_COMMAND.sub("NAME", name), show_console_param())
 
@@ -21,13 +23,6 @@ class Yamatanooroti::ConhostTerm
     attach_terminal do |conin, conout|
       DL.set_console_window_size(conout, height, width)
     end
-  end
-
-  def close
-    if @target && !@target.closed?
-      @target.close
-    end
-    @result ||= retrieve_screen if !DL.interrupted? && @console_process_id
   end
 
   def close_console(need_to_close = true)

@@ -10,7 +10,7 @@ module Yamatanooroti::WindowsTestCaseModule
   end
 
   def close
-    @terminal.close
+    @result = @terminal.close
   end
 
   def result
@@ -35,7 +35,7 @@ module Yamatanooroti::WindowsTestCaseModule
       end
     end
     if Yamatanooroti.options.conhost
-      @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait, name)
+      @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait, @timeout, name)
     else
       @terminal = Yamatanooroti::WindowsTerminalTerm.setup_console(height, width, @wait, @timeout, name)
     end
@@ -74,7 +74,7 @@ module Yamatanooroti::WindowsTestCaseModule
         screen = convert_proc.call(@terminal.retrieve_screen)
         break screen if Time.now >= retry_until
         break screen if check_proc.call(screen)
-        sleep @wait
+        @terminal.sleep_wait
       end
     end
     assert_proc.call(screen)

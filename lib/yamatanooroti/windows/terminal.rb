@@ -229,6 +229,7 @@ class Yamatanooroti::WindowsTerminalTerm
     @timeout = timeout
     @result = nil
     @codepage_success_p = nil
+    @wrote_and_not_yet_waited = false
 
     @process_ids = [new_wt(height, width)]
   end
@@ -244,13 +245,6 @@ class Yamatanooroti::WindowsTerminalTerm
     puts min_size.then { "Windows Terminal smallest size: rows: #{_1}, columns: #{_2}" }
     wt.close!
     puts @@max_size.then { "Use test window size: rows: #{_1}, columns: #{_2}" }
-  end
-
-  def close
-    if @target && !@target.closed?
-      @target.close
-    end
-    @result ||= retrieve_screen if !DL.interrupted? && @console_process_id
   end
 
   def close_console(need_to_close = true)
