@@ -312,7 +312,7 @@ module Yamatanooroti::WindowsTermMixin
     end
 
     def sync
-      buffer = ""
+      buffer = +""
       if closed?
         if !@errin.closed?
           @t.kill
