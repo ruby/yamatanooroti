@@ -238,13 +238,13 @@ class Yamatanooroti::WindowsTerminalTerm
     wt = self.new(999, 999, 0.01, 5.0)
     max_size = wt.get_size
     @@max_size = [[max_size[0], 60].min, [max_size[1], 200].min]
-    puts max_size.then { "Windows Terminal maximum size: rows: #{_1}, columns: #{_2}" }
+    puts max_size.then { |r, c| "Windows Terminal maximum size: rows: #{r}, columns: #{c}" }
     wt.close!
     wt = self.new(2, 2, 0.01, 5.0)
     min_size = @@min_size = wt.get_size
-    puts min_size.then { "Windows Terminal smallest size: rows: #{_1}, columns: #{_2}" }
+    puts min_size.then { |r, c| "Windows Terminal smallest size: rows: #{r}, columns: #{c}" }
     wt.close!
-    puts @@max_size.then { "Use test window size: rows: #{_1}, columns: #{_2}" }
+    puts @@max_size.then {|r, c|  "Use test window size: rows: #{r}, columns: #{c}" }
   end
 
   def close_console(need_to_close = true)
