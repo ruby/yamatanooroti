@@ -126,6 +126,7 @@ module Yamatanooroti::WindowsDefinition
   ATTACH_PARENT_PROCESS = -1
   KEY_EVENT = 0x0001
   SW_HIDE = 0
+  SW_SHOWNORMAL = 1
   SW_SHOWNOACTIVE = 4
   SW_SHOWMINNOACTIVE = 7
   SW_SHOWNA = 8
@@ -204,9 +205,13 @@ module Yamatanooroti::WindowsDefinition
   # BOOL WINAPI GenerateConsoleCtrlEvent(DWORD dwCtrlEvent, DWORD dwProcessGroupId);
   extern 'BOOL GenerateConsoleCtrlEvent(DWORD, DWORD);', :stdcall
 
-  private def error_message(r, method_name, exception: true)
-    return if not r.zero?
+  private def successful_or_if_not_messageout(r, method_name, exception: true)
+    return true if not r.zero?
     err = Fiddle.win32_last_error
+    if err == 0
+      $stderr.puts "Info: #{method_name} returns zero but win32_last_error has successful zero."
+      return true
+    end
     string = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP, FREE)
     n = FormatMessageW(
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
@@ -229,13 +234,14 @@ module Yamatanooroti::WindowsDefinition
       raise msg
     else
       $stderr.puts msg
+      return false
     end
   end
 
   def get_console_screen_buffer_info(handle)
     csbi = CONSOLE_SCREEN_BUFFER_INFO.malloc(FREE)
     r = GetConsoleScreenBufferInfo(handle, csbi)
-    error_message(r, 'GetConsoleScreenBufferInfo')
+    successful_or_if_not_messageout(r, 'GetConsoleScreenBufferInfo')
     return csbi
   end
 
@@ -243,7 +249,7 @@ module Yamatanooroti::WindowsDefinition
     csbi = CONSOLE_SCREEN_BUFFER_INFOEX.malloc(FREE)
     csbi.cbSize = CONSOLE_SCREEN_BUFFER_INFOEX.size
     r = GetConsoleScreenBufferInfoEx(handle, csbi)
-    error_message(r, 'GetConsoleScreenBufferSize')
+    successful_or_if_not_messageout(r, 'GetConsoleScreenBufferSize')
     csbi.dwSize_X = w
     csbi.dwSize_Y = buffer_height
     csbi.Left = 0
@@ -251,8 +257,7 @@ module Yamatanooroti::WindowsDefinition
     csbi.Top = [csbi.Top, buffer_height - h].min
     csbi.Bottom = csbi.Top + h - 1
     r = SetConsoleScreenBufferInfoEx(handle, csbi)
-    error_message(r, 'SetConsoleScreenBufferInfoEx')
-    return r != 0
+    return successful_or_if_not_messageout(r, 'SetConsoleScreenBufferInfoEx')
   end
 
   def set_console_window_info(handle, h, w)
@@ -262,8 +267,7 @@ module Yamatanooroti::WindowsDefinition
     rect.Right = w - 1
     rect.Bottom = h - 1
     r = SetConsoleWindowInfo(handle, 1, rect)
-    error_message(r, 'SetConsoleWindowInfo')
-    return r != 0
+    return successful_or_if_not_messageout(r, 'SetConsoleWindowInfo')
   end
 
   def set_console_window_size(handle, h, w)
@@ -290,26 +294,24 @@ module Yamatanooroti::WindowsDefinition
       0
     )
     fh = [fh].pack("J").unpack1("J")
-    error_message(0, name) if fh == INVALID_HANDLE_VALUE
+    successful_or_if_not_messageout(0, name) if fh == INVALID_HANDLE_VALUE
     fh
   end
 
   def close_handle(handle)
     r = CloseHandle(handle)
-    error_message(r, "CloseHandle")
-    return r != 0
+    return successful_or_if_not_messageout(r, "CloseHandle")
   end
 
   def free_console
     r = FreeConsole()
-    error_message(r, "FreeConsole")
-    return r != 0
+    return successful_or_if_not_messageout(r, "FreeConsole")
   end
 
   def attach_console(pid = ATTACH_PARENT_PROCESS, maybe_fail: false)
     r = AttachConsole(pid)
-    error_message(r, 'AttachConsole') unless maybe_fail
-    return r != 0
+    return successful_or_if_not_messageout(r, 'AttachConsole') unless maybe_fail
+    return r != 0 # || Fiddle.win32_last_error == 0 # this case couses problem
   end
 
   SHOWWINDOW_MAP = {
@@ -346,7 +348,7 @@ module Yamatanooroti::WindowsDefinition
         Fiddle::NULL, Fiddle::NULL,
         startup_info, console_process_info
       )
-      error_message(r, 'CreateProcessW')
+      successful_or_if_not_messageout(r, 'CreateProcessW')
     end
     close_handle(console_process_info.hProcess)
     close_handle(console_process_info.hThread)
@@ -355,7 +357,7 @@ module Yamatanooroti::WindowsDefinition
 
   def get_std_handle(stdhandle)
     fh = GetStdHandle(stdhandle)
-    error_message(0, name) if fh == INVALID_HANDLE_VALUE
+    successful_or_if_not_messageout(0, name) if fh == INVALID_HANDLE_VALUE
     fh
   end
 
@@ -377,7 +379,7 @@ module Yamatanooroti::WindowsDefinition
     buffer = Fiddle::Pointer.malloc(Fiddle::SIZEOF_SHORT * width, FREE)
     n = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     r = ReadConsoleOutputCharacterW(handle, buffer, width, row << 16, n)
-    error_message(r, "ReadConsoleOutputCharacterW")
+    successful_or_if_not_messageout(r, "ReadConsoleOutputCharacterW")
     return wc2mb(buffer[0, n.to_str.unpack1("L") * 2]).gsub(/ *$/, "")
   end
 
@@ -417,14 +419,14 @@ module Yamatanooroti::WindowsDefinition
   def write_console_input(handle, records, n)
     written = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     r = WriteConsoleInputW(handle, records, n, written)
-    error_message(r, 'WriteConsoleInput')
+    successful_or_if_not_messageout(r, 'WriteConsoleInput')
     return written.to_str.unpack1('L')
   end
 
   def get_number_of_console_input_events(handle)
     n = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     r = GetNumberOfConsoleInputEvents(handle, n)
-    error_message(r, 'GetNumberOfConsoleInputEvents')
+    successful_or_if_not_messageout(r, 'GetNumberOfConsoleInputEvents')
     return n.to_str.unpack1('L')
   end
 
@@ -432,8 +434,7 @@ module Yamatanooroti::WindowsDefinition
     mode = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     mode[0, Fiddle::SIZEOF_DWORD] = "\0".b * Fiddle::SIZEOF_DWORD
     r = GetConsoleMode(handle, mode)
-    error_message(r, 'GetConsoleMode', exception: false)
-    mode.to_str.unpack1('L')
+    successful_or_if_not_messageout(r, 'GetConsoleMode', exception: false) ? mode.to_str.unpack1('L') : nil
   end
 
   def set_console_mode(handle, mode)
@@ -442,12 +443,12 @@ module Yamatanooroti::WindowsDefinition
 
   def set_console_codepage(cp)
     r = SetConsoleCP(cp)
-    error_message(r, 'SetConsoleCP', exception: false)
+    return successful_or_if_not_messageout(r, 'SetConsoleCP', exception: false)
   end
 
   def set_console_output_codepage(cp)
     r = SetConsoleOutputCP(cp)
-    error_message(r, 'SetConsoleOutputCP', exception: false)
+    return successful_or_if_not_messageout(r, 'SetConsoleOutputCP', exception: false)
   end
 
   def get_console_codepage()
@@ -460,8 +461,7 @@ module Yamatanooroti::WindowsDefinition
 
   def generate_console_ctrl_event(event, pgrp)
     r = GenerateConsoleCtrlEvent(event, pgrp)
-    error_message(r, 'GenerateConsoleCtrlEvent')
-    return r != 0
+    return successful_or_if_not_messageout(r, 'GenerateConsoleCtrlEvent')
   end
 
   # Ctrl+C trap support
