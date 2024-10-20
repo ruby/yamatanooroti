@@ -51,16 +51,6 @@ class Yamatanooroti::WindowsTerminalTerm
     do_tasklist("WINDOWTITLE eq #{name}")
   end
 
-  private def with_timeout(timeout_message, timeout = @timeout, &block)
-    wait_until = Time.now + timeout
-    loop do
-      result = block.call
-      break result if result
-      raise timeout_message if wait_until < Time.now
-      sleep @wait
-    end
-  end
-
   private def invoke_wt_process(command, marker, keeper_name)
     DL.create_console(command, show_console_param())
     # default timeout seems to be too short

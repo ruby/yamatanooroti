@@ -15,10 +15,11 @@ class Yamatanooroti::ConhostTerm
 
     @console_process_id = DL.create_console(CONSOLE_KEEPING_COMMAND.sub("NAME", name), show_console_param())
 
+    sleep 0.1 if Yamatanooroti.options.windows == :"legacy-conhost" # ad-hoc
+
     # wait for console startup complete
-    8.times do |n|
-      break if attach_terminal(open: false, exception: false) { true }
-      sleep 0.01 * 2**n
+    with_timeout("Console process startup timed out.") do
+      attach_terminal(open: false, exception: false) { true }
     end
 
     attach_terminal do |conin, conout|

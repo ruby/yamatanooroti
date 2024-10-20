@@ -212,6 +212,16 @@ module Yamatanooroti::WindowsTermMixin
     map.fetch(Yamatanooroti.options.show_console ? :show : :hide)
   end
 
+  private def with_timeout(timeout_message, timeout = @timeout, &block)
+    wait_until = Time.now + timeout
+    loop do
+      result = block.call
+      break result if result
+      raise timeout_message if wait_until < Time.now
+      sleep @wait
+    end
+  end
+
   private def attach_terminal(open: true, exception: true)
     stderr = $stderr
     $stderr = StringIO.new
