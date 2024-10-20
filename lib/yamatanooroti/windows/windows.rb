@@ -407,20 +407,22 @@ module Yamatanooroti::WindowsTermMixin
   end
 
   def close
-    if !@result && @console_process_id
-      sleep @timeout if @wrote_and_not_yet_waited # wait a long. avoid write();close() sequence
+    close_request = @target && !@target.closed?
+    retrieve_request = !DL.interrupted? && @console_process_id
+
+    if close_request && retrieve_request && !@result
+      if @wrote_and_not_yet_waited # wait a long. avoid write();close() sequence
+        sleep @timeout
+        puts "\r#{@name}: close() just after write() will ultimately slow test down. Put assert_screen() before close()."
+      end
     end
-    if @target && !@target.closed?
-      @target.close
-    end
-    if !DL.interrupted? && @console_process_id
-      @result = retrieve_screen
-    end
+
+    @target.close if close_request
+    @result = retrieve_screen if retrieve_request
     @result ||= ""
   end
 
-  def sleep_wait
-    sleep @wait
+  def clear_need_wait_flag
     @wrote_and_not_yet_waited = false
   end
 

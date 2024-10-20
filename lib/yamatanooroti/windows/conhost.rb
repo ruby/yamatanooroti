@@ -8,6 +8,7 @@ class Yamatanooroti::ConhostTerm
   def initialize(height, width, wait, timeout, name)
     @wait = wait
     @timeout = timeout
+    @name = name
     @result = nil
     @codepage_success_p = nil
     @wrote_and_not_yet_waited = false

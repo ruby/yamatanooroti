@@ -104,14 +104,14 @@ class Yamatanooroti::WindowsTerminalTerm
     return invoke_wt_process(command, marker_command.split(" ").first, "new_wt")
   end
 
-  def split_pane(div = 0.5, splitter: :v, name: nil)
+  def split_pane(div = 0.5, splitter: :v, title: @name)
     marker_command = CONSOLE_MARKING_COMMAND
 
     command = "#{Yamatanooroti::WindowsConsoleSettings.wt_exe} " \
               "-w #{@wt_id} " \
               "move-focus first; " \
               "sp #{splitter == :v ? "-V" : "-H"} "\
-              "--title #{name || @wt_id} " \
+              "--title #{title || @wt_id} " \
               "-s #{div} " \
               "#{marker_command}"
     pid = invoke_wt_process(command, marker_command.split(" ").first, "split_pane")
@@ -192,6 +192,8 @@ class Yamatanooroti::WindowsTerminalTerm
     mother_height = @@max_size[0]
     mother_width = @@max_size[1]
 
+    @@mother_wt.name = name
+
     if height > mother_height
       raise "console height #{height} grater than maximum(#{mother_height})"
     end
@@ -201,7 +203,7 @@ class Yamatanooroti::WindowsTerminalTerm
 
     if height != mother_height
       result_h = @@hsplit_info.search_div(height) do |div|
-        @@mother_wt.split_pane(div, splitter: :h, name: name)
+        @@mother_wt.split_pane(div, splitter: :h)
         @@mother_wt.move_focus("first")
         h = @@mother_wt.get_size[0]
         @@mother_wt.close_pane if h != height
@@ -212,7 +214,7 @@ class Yamatanooroti::WindowsTerminalTerm
 
     if width != mother_width
       result_w = @@vsplit_info.search_div(width) do |div|
-        @@mother_wt.split_pane(div, splitter: :v, name: name)
+        @@mother_wt.split_pane(div, splitter: :v)
         @@mother_wt.move_focus("first")
         w = @@mother_wt.get_size[1]
         @@mother_wt.close_pane if w != width
@@ -223,6 +225,8 @@ class Yamatanooroti::WindowsTerminalTerm
 
     return @@mother_wt
   end
+
+  attr_accessor :name
 
   def initialize(height, width, wait, timeout)
     @wait = wait
@@ -259,6 +263,7 @@ class Yamatanooroti::WindowsTerminalTerm
     end
     @process_ids = [@console_process_id = nt]
     @result = nil
+    @name = nil
   end
 
   def close!
