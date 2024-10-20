@@ -52,14 +52,20 @@ jobs:
       matrix:
         os: [ windows-2019, windows-2022 ]
         ruby: ${{ fromJson(needs.ruby-versions.outputs.versions) }}
-        console: [ conhost, legacy-conhost, 1.21, 1.22preview, canary ]
+        console: [ conhost, legacy-conhost, stable ]
         exclude:
-          - console: 1.21
+          - ruby: 2.5
+          - console: stable
             os: windows-2019
-          - console: 1.22preview
-            os: windows-2019
-          - console: canary
-            os: windows-2019
+          - console: legacy-conhost
+            os: windows-2022
+        include:
+          - os: windows-2022
+            ruby: 3.3
+            console: preview
+          - os: windows-2022
+            ruby: 3.3
+            console: canary
     defaults:
       run:
         shell: bash
