@@ -393,6 +393,27 @@ module Yamatanooroti::WindowsDefinition
     return r
   end
 
+  def build_key_input_record(str)
+    codes = str.chars.map do |c|
+      c = "\r" if c == "\n"
+      byte = c.getbyte(0)
+      if c.bytesize == 1 and byte.allbits?(0x80) # with Meta key
+        [-(byte ^ 0x80)]
+      else
+        mb2wc(c).unpack("S*")
+      end
+    end.flatten
+    record = INPUT_RECORD_WITH_KEY_EVENT.malloc(FREE)
+    records = codes.reduce("".b) do |records, code|
+      set_input_record(record, code)
+      record.bKeyDown = 1
+      records << record.to_ptr.to_str
+      record.bKeyDown = 0
+      records << record.to_ptr.to_str
+    end
+    [records, codes.size * 2]
+  end
+
   def write_console_input(handle, records, n)
     written = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, FREE)
     r = WriteConsoleInputW(handle, records, n, written)
@@ -492,6 +513,9 @@ end
 
 if __FILE__ == $0
   DL = Yamatanooroti::WindowsDefinition
+  def invoke_key(conin, str)
+    DL.write_console_input(conin, *DL.build_key_input_record(str))
+  end
   cin = DL.get_std_handle(DL::STD_INPUT_HANDLE)
   cout = DL.get_std_handle(DL::STD_OUTPUT_HANDLE)
   cerr = DL.get_std_handle(DL::STD_ERROR_HANDLE)

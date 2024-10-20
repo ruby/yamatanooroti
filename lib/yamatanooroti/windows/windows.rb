@@ -351,25 +351,9 @@ module Yamatanooroti::WindowsTermMixin
 
   def do_write(str)
     check_interrupt
-    codes = str.chars.map do |c|
-      c = "\r" if c == "\n"
-      byte = c.getbyte(0)
-      if c.bytesize == 1 and byte.allbits?(0x80) # with Meta key
-        [-(byte ^ 0x80)]
-      else
-        DL.mb2wc(c).unpack("S*")
-      end
-    end.flatten
-    record = DL::INPUT_RECORD_WITH_KEY_EVENT.malloc(DL::FREE)
-    records = codes.reduce("".b) do |records, code|
-      DL.set_input_record(record, code)
-      record.bKeyDown = 1
-      records << record.to_ptr.to_str
-      record.bKeyDown = 0
-      records << record.to_ptr.to_str
-    end
+    records, count = DL.build_key_input_record(str)
     attach_terminal do |conin, conout|
-      DL.write_console_input(conin, records, codes.size * 2)
+      DL.write_console_input(conin, records, count)
       loop do
         sleep @wait
         n = DL.get_number_of_console_input_events(conin)
