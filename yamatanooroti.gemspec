@@ -24,14 +24,4 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = Gem::Requirement.new('>= 2.5')
 
   spec.add_dependency 'test-unit'
-  if Gem.win_platform?
-    spec.add_dependency 'fiddle', '>= 1.0.8' if
-      (RUBY_ENGINE == "ruby" && RUBY_VERSION >= '3.4') ||
-      Gem::Version.new("1.0.8") > begin
-        require 'fiddle'
-        Gem::Version.new(Fiddle::VERSION)
-      rescue
-        Gem::Version.new("0.0.0")
-      end
-  end
 end
