@@ -2,12 +2,15 @@ require 'yamatanooroti'
 require 'tmpdir'
 
 class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
+  def teardown
+    close
+  end
+
   def test_winsize
     start_terminal(5, 30, ['ruby', '-rio/console', '-e', 'puts(IO.console.winsize.inspect)'])
     assert_screen(<<~EOC)
       [5, 30]
     EOC
-    close
   end
 
   def test_wait_for_startup_message
@@ -19,14 +22,12 @@ class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
       prompt>hello
       HELLO
     EOC
-    close
   end
 
   def test_move_cursor_and_render
     start_terminal(5, 30, ['ruby', '-rio/console', '-e', 'STDOUT.puts(?A);STDOUT.goto(2,2);STDOUT.puts(?B)'])
     assert_screen(['A', '', '  B', '', ''])
     assert_equal(['A', '', '  B', '', ''], result)
-    close
   end
 
   def test_meta_key
@@ -38,7 +39,6 @@ class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
     assert_screen(<<~EOC)
       >>>aaa bbb ccc
     EOC
-    close
   ensure
     get_out_from_tmpdir
   end
@@ -50,7 +50,6 @@ class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
         bbb
       EOC
     end
-    close
   end
 
   private
