@@ -46,6 +46,14 @@ Tasks: TOP => default => test
 (See full trace by running task with --trace)
 ```
 
+### Commandline Options
+
+Yamatanooroti provides some additional TESTOPTS options.
+
+This is more important when running on Windows because of the type of console to be tested is specified in TESTOPTS.
+
+Please see ```rake TESTOPTS="-h"```.
+
 ### Advanced Usage
 
 If you want to specify vterm environment that needs vterm gem, you can use `Yamatanooroti::VTermTestCase`:

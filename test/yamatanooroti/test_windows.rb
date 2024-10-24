@@ -13,3 +13,26 @@ class Yamatanooroti::TestWindows < Test::Unit::TestCase
     end
   end
 end
+
+class Yamatanooroti::TestWindowsSpecific < Yamatanooroti::TestCase
+  if Yamatanooroti.win?
+    def test_console_selection
+      start_terminal(5, 30, ['ruby', 'bin/simple_repl'], startup_message: 'prompt>')
+      assert_equal(Yamatanooroti.options.terminal ? :terminal : Yamatanooroti.options.windows, identify)
+    end
+
+    def test_codepage_932
+      start_terminal(5, 30, ['ruby', '-e', 'puts(%Q!Encoding:#{Encoding.find(%Q[locale]).name}!)'], startup_message: 'Encoding:', codepage: 932)
+      omit "codepage 932 not supported" if !codepage_success?
+      assert_equal(['Encoding:Windows-31J', '', '', '', ''], result)
+      close
+    end
+
+    def test_codepage_437
+      start_terminal(5, 30, ['ruby', '-e', 'puts(%Q!Encoding:#{Encoding.find(%Q[locale]).name}!)'], startup_message: 'Encoding:', codepage: 437)
+      omit "codepage 437 not supported" if !codepage_success?
+      assert_equal(['Encoding:IBM437', '', '', '', ''], result)
+      close
+    end
+  end
+end

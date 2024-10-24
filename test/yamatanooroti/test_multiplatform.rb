@@ -29,13 +29,13 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
   end
 
   def test_assert_screen_retries
-    write("sleep 1\n")
+    write("sleep 1 && 1\n")
     assert_screen(/=> 1\nprompt>/)
-    assert_equal(['prompt> sleep 1', '=> 1', 'prompt>', '', ''], result)
+    assert_equal(['prompt> sleep 1 && 1', '=> 1', 'prompt>', '', ''], result)
   end
 
   def test_assert_screen_timeout
-    write("sleep 3\n")
+    write("sleep 3 && 3\n")
     assert_raise do
       assert_screen(/=> 3\nprompt>/)
     end
@@ -51,14 +51,26 @@ class Yamatanooroti::TestMultiplatform < Yamatanooroti::TestCase
       prompt>
     EOC
   end
+end
+
+class Yamatanooroti::TestMultiplatformMultiByte < Yamatanooroti::TestCase
+  def setup
+    if Yamatanooroti.win?
+      start_terminal(5, 30, ['ruby', 'bin/simple_repl'], startup_message: 'prompt>', codepage: 932)
+    else
+      start_terminal(5, 30, ['ruby', 'bin/simple_repl'], startup_message: 'prompt>')
+    end
+  end
 
   def test_fullwidth
+    omit "multibyte char not supported by env" if Yamatanooroti.win? and !codepage_success?
     write(":あ\n")
     assert_screen(/=> :あ\nprompt>/)
     assert_equal(['prompt> :あ', '=> :あ', 'prompt>', '', ''], result)
   end
 
   def test_two_fullwidth
+    omit "multibyte char not supported by env" if Yamatanooroti.win? and !codepage_success?
     write(":あい\n")
     assert_screen(/=> :あい\nprompt>/)
     assert_equal(['prompt> :あい', '=> :あい', 'prompt>', '', ''], result)

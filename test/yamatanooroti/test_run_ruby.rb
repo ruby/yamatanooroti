@@ -11,6 +11,7 @@ class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
     assert_screen(<<~EOC)
       [5, 30]
     EOC
+    close
   end
 
   def test_wait_for_startup_message
@@ -32,7 +33,13 @@ class Yamatanooroti::TestRunRuby < Yamatanooroti::TestCase
 
   def test_meta_key
     get_into_tmpdir
-    start_terminal(5, 30, ['ruby', '-rreline', '-e', 'Reline.readline(%{>>>})'], startup_message: />{3}/)
+    if !Yamatanooroti.win? || (RUBY_VERSION > '2.6.99' && RUBY_VERSION < '3.4.0')
+      command = ['ruby', '-rreline', '-e', 'Reline.readline(%{>>>})']
+    else
+      command = ['bundle', 'exec', 'ruby', '-e', 'require "reline"; Reline.readline(%{>>>})']
+      # older ruby inboxed reline (0.1.5) has a windows specific bug. use newer reline
+    end
+    start_terminal(5, 30, command, startup_message: />{3}/)
     write('aaa ccc')
     write("\M-b")
     write('bbb ')

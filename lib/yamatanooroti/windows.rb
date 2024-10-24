@@ -1,521 +1,86 @@
 require 'test/unit'
-require 'fiddle/import'
-require 'fiddle/types'
-
-module Yamatanooroti::WindowsDefinition
-  extend Fiddle::Importer
-  dlload 'kernel32.dll', 'psapi.dll', 'user32.dll'
-  include Fiddle::Win32Types
-
-  FREE = Fiddle::Function.new(Fiddle::RUBY_FREE, [Fiddle::TYPE_VOIDP], Fiddle::TYPE_VOID)
-
-  typealias 'SHORT', 'short'
-  typealias 'HPCON', 'HANDLE'
-  typealias 'HWND', 'HANDLE'
-  typealias 'HRESULT', 'HANDLE'
-  typealias 'LPVOID', 'void*'
-  typealias 'SIZE_T', 'size_t'
-  typealias 'LPWSTR', 'void*'
-  typealias 'LPBYTE', 'void*'
-  typealias 'LPCWSTR', 'void*'
-  typealias 'LPPROC_THREAD_ATTRIBUTE_LIST', 'void*'
-  typealias 'PSIZE_T', 'void*'
-  typealias 'DWORD_PTR', 'void*'
-  typealias 'LPCVOID', 'void*'
-  typealias 'LPDWORD', 'void*'
-  typealias 'LPOVERLAPPED', 'void*'
-  typealias 'WCHAR', 'unsigned short'
-  typealias 'LPCWCH', 'void*'
-  typealias 'LPSTR', 'void*'
-  typealias 'LPCCH', 'void*'
-  typealias 'LPBOOL', 'void*'
-  typealias 'LPWORD', 'void*'
-  typealias 'ULONG_PTR', 'ULONG*'
-  typealias 'LONG', 'int'
-
-  Fiddle::SIZEOF_HANDLE = Fiddle::SIZEOF_LONG
-  Fiddle::SIZEOF_HPCON = Fiddle::SIZEOF_LONG
-  Fiddle::SIZEOF_HRESULT = Fiddle::SIZEOF_LONG
-  Fiddle::SIZEOF_DWORD = Fiddle::SIZEOF_LONG
-  Fiddle::SIZEOF_WORD = Fiddle::SIZEOF_SHORT
-
-  COORD = struct [
-    'SHORT X',
-    'SHORT Y'
-  ]
-  typealias 'COORD', 'DWORD32'
-
-  SMALL_RECT = struct [
-    'SHORT Left',
-    'SHORT Top',
-    'SHORT Right',
-    'SHORT Bottom'
-  ]
-  typealias 'SMALL_RECT*', 'DWORD64*'
-  typealias 'PSMALL_RECT', 'SMALL_RECT*'
-
-  CONSOLE_SCREEN_BUFFER_INFO = struct [
-    'COORD dwSize',
-    'COORD dwCursorPosition',
-    'WORD wAttributes',
-    'SHORT Left', 'SHORT Top', 'SHORT Right', 'SHORT Bottom', # 'SMALL_RECT srWindow',
-    'SHORT MaxWidth', 'SHORT MaxHeight' # 'COORD dwMaximumWindowSize'
-  ]
-  typealias 'PCONSOLE_SCREEN_BUFFER_INFO', 'CONSOLE_SCREEN_BUFFER_INFO*'
-
-  SECURITY_ATTRIBUTES = struct [
-    'DWORD nLength',
-    'LPVOID lpSecurityDescriptor',
-    'BOOL bInheritHandle'
-  ]
-  typealias 'PSECURITY_ATTRIBUTES', 'SECURITY_ATTRIBUTES*'
-  typealias 'LPSECURITY_ATTRIBUTES', 'SECURITY_ATTRIBUTES*'
-
-  STARTUPINFOW = struct [
-    'DWORD cb',
-    'LPWSTR lpReserved',
-    'LPWSTR lpDesktop',
-    'LPWSTR lpTitle',
-    'DWORD dwX',
-    'DWORD dwY',
-    'DWORD dwXSize',
-    'DWORD dwYSize',
-    'DWORD dwXCountChars',
-    'DWORD dwYCountChars',
-    'DWORD dwFillAttribute',
-    'DWORD dwFlags',
-    'WORD wShowWindow',
-    'WORD cbReserved2',
-    'LPBYTE lpReserved2',
-    'HANDLE hStdInput',
-    'HANDLE hStdOutput',
-    'HANDLE hStdError'
-  ]
-  typealias 'LPSTARTUPINFOW', 'STARTUPINFOW*'
-
-  PROCESS_INFORMATION = struct [
-    'HANDLE hProcess',
-    'HANDLE hThread',
-    'DWORD  dwProcessId',
-    'DWORD  dwThreadId'
-  ]
-  typealias 'PPROCESS_INFORMATION', 'PROCESS_INFORMATION*'
-  typealias 'LPPROCESS_INFORMATION', 'PROCESS_INFORMATION*'
-
-  INPUT_RECORD_WITH_KEY_EVENT = struct [
-    'WORD EventType',
-    'BOOL bKeyDown',
-    'WORD wRepeatCount',
-    'WORD wVirtualKeyCode',
-    'WORD wVirtualScanCode',
-    'WCHAR UnicodeChar',
-    ## union 'CHAR  AsciiChar',
-    'DWORD dwControlKeyState'
-  ]
-
-  CHAR_INFO = struct [
-    'WCHAR UnicodeChar',
-    'WORD Attributes'
-  ]
-  typealias 'PCHAR_INFO', 'CHAR_INFO*'
-
-  PROCESSENTRY32W = struct [
-    'DWORD dwSize',
-    'DWORD cntUsage',
-    'DWORD th32ProcessID',
-    'ULONG_PTR th32DefaultHeapID',
-    'DWORD th32ModuleID',
-    'DWORD cntThreads',
-    'DWORD th32ParentProcessID',
-    'LONG pcPriClassBase',
-    'DWORD dwFlags',
-    'WCHAR szExeFile[260]'
-  ]
-  typealias 'LPPROCESSENTRY32W', 'PROCESSENTRY32W*'
-
-  CONSOLE_FONT_INFOEX = struct [
-    'ULONG cbSize',
-    'DWORD nFont',
-    'DWORD32 dwFontSize',
-    'UINT FontFamily',
-    'UINT FontWeight',
-    'WCHAR FaceName[32]'
-  ]
-  typealias 'PCONSOLE_FONT_INFOEX', 'CONSOLE_FONT_INFOEX*'
-
-  STD_INPUT_HANDLE = -10
-  STD_OUTPUT_HANDLE = -11
-  STD_ERROR_HANDLE = -12
-  ATTACH_PARENT_PROCESS = -1
-  KEY_EVENT = 0x0001
-  TH32CS_SNAPPROCESS = 0x00000002
-  PROCESS_ALL_ACCESS = 0x001FFFFF
-  SW_HIDE = 0
-  LEFT_ALT_PRESSED = 0x0002
-
-  # HANDLE GetStdHandle(DWORD nStdHandle);
-  extern 'HANDLE GetStdHandle(DWORD);', :stdcall
-  # BOOL CloseHandle(HANDLE hObject);
-  extern 'BOOL CloseHandle(HANDLE);', :stdcall
-
-  # BOOL FreeConsole(void);
-  extern 'BOOL FreeConsole(void);', :stdcall
-  # BOOL AllocConsole(void);
-  extern 'BOOL AllocConsole(void);', :stdcall
-  # BOOL AttachConsole(DWORD dwProcessId);
-  extern 'BOOL AttachConsole(DWORD);', :stdcall
-  # BOOL ShowWindow(HWND hWnd, int nCmdShow);
-  extern 'BOOL ShowWindow(HWND hWnd,int nCmdShow);', :stdcall
-  # HWND WINAPI GetConsoleWindow(void);
-  extern 'HWND GetConsoleWindow(void);', :stdcall
-  # BOOL WINAPI SetConsoleScreenBufferSize(HANDLE hConsoleOutput, COORD dwSize);
-  extern 'BOOL SetConsoleScreenBufferSize(HANDLE, COORD);', :stdcall
-  # BOOL WINAPI SetConsoleWindowInfo(HANDLE hConsoleOutput, BOOL bAbsolute, const SMALL_RECT *lpConsoleWindow);
-  extern 'BOOL SetConsoleWindowInfo(HANDLE, BOOL, PSMALL_RECT);', :stdcall
-  # BOOL WriteConsoleInputW(HANDLE hConsoleInput, const INPUT_RECORD *lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsWritten);
-  extern 'BOOL WriteConsoleInputW(HANDLE, const INPUT_RECORD*, DWORD, LPDWORD);', :stdcall
-  # SHORT VkKeyScanW(WCHAR ch);
-  extern 'SHORT VkKeyScanW(WCHAR);', :stdcall
-  # UINT MapVirtualKeyW(UINT uCode, UINT uMapType);
-  extern 'UINT MapVirtualKeyW(UINT, UINT);', :stdcall
-  # BOOL WINAPI ReadConsoleOutputCharacterW(HANDLE hConsoleOutput, LPWSTR lpCharacter, DWORD nLength, COORD dwReadCoord, LPDWORD lpNumberOfCharsRead);
-  extern 'BOOL ReadConsoleOutputCharacterW(HANDLE, LPWSTR, DWORD, COORD, LPDWORD);', :stdcall
-  # BOOL WINAPI GetConsoleScreenBufferInfo(HANDLE hConsoleOutput, PCONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
-  extern 'BOOL GetConsoleScreenBufferInfo(HANDLE, PCONSOLE_SCREEN_BUFFER_INFO);', :stdcall
-  # BOOL WINAPI GetCurrentConsoleFontEx(HANDLE hConsoleOutput, BOOL bMaximumWindow, PCONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);
-  extern 'BOOL GetCurrentConsoleFontEx(HANDLE, BOOL, PCONSOLE_FONT_INFOEX);', :stdcall
-  # BOOL WINAPI SetCurrentConsoleFontEx(HANDLE hConsoleOutput, BOOL bMaximumWindow, PCONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);
-  extern 'BOOL SetCurrentConsoleFontEx(HANDLE, BOOL, PCONSOLE_FONT_INFOEX);', :stdcall
-
-  # BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);
-  extern 'BOOL CreateProcessW(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);', :stdcall
-  # HANDLE CreateToolhelp32Snapshot(DWORD dwFlags, DWORD th32ProcessID);
-  extern 'HANDLE CreateToolhelp32Snapshot(DWORD, DWORD);', :stdcall
-  # BOOL Process32First(HANDLE hSnapshot, LPPROCESSENTRY32W lppe);
-  extern 'BOOL Process32FirstW(HANDLE, LPPROCESSENTRY32W);', :stdcall
-  # BOOL Process32Next(HANDLE hSnapshot, LPPROCESSENTRY32 lppe);
-  extern 'BOOL Process32NextW(HANDLE, LPPROCESSENTRY32W);', :stdcall
-  # DWORD GetCurrentProcessId();
-  extern 'DWORD GetCurrentProcessId();', :stdcall
-  # HANDLE OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId);
-  extern 'HANDLE OpenProcess(DWORD, BOOL, DWORD);', :stdcall
-  # BOOL TerminateProcess(HANDLE hProcess, UINT uExitCode);
-  extern 'BOOL TerminateProcess(HANDLE, UINT);', :stdcall
-  #BOOL TerminateThread(HANDLE hThread, DWORD dwExitCode);
-  extern 'BOOL TerminateThread(HANDLE, DWORD);', :stdcall
-
-  # int MultiByteToWideChar(UINT CodePage, DWORD dwFlags, LPCSTR lpMultiByteStr, int cbMultiByte, LPWSTR lpWideCharStr, int cchWideChar);
-  extern 'int MultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int);', :stdcall
-  # int WideCharToMultiByte(UINT CodePage, DWORD dwFlags, _In_NLS_string_(cchWideChar)LPCWCH lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, LPCCH lpDefaultChar, LPBOOL lpUsedDefaultChar);
-  extern 'int WideCharToMultiByte(UINT, DWORD, LPCWCH, int, LPSTR, int, LPCCH, LPBOOL);', :stdcall
-
-  typealias 'LPTSTR', 'void*'
-  typealias 'HLOCAL', 'HANDLE'
-  extern 'DWORD FormatMessage(DWORD dwFlags, LPCVOID lpSource, DWORD dwMessageId, DWORD dwLanguageId, LPTSTR lpBuffer, DWORD nSize, va_list *Arguments);', :stdcall
-  extern 'HLOCAL LocalFree(HLOCAL hMem);', :stdcall
-  extern 'DWORD GetLastError();', :stdcall
-  FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
-  FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
-  LANG_NEUTRAL = 0x00
-  SUBLANG_DEFAULT = 0x01
-  extern 'int GetSystemMetrics(int);', :stdcall
-  SM_CXMIN = 28
-  SM_CYMIN = 29
-end
+require_relative 'windows/windows-definition'
+require_relative 'windows/windows-setup'
+require_relative 'windows/windows'
+require_relative 'windows/conhost'
+require_relative 'windows/terminal'
 
 module Yamatanooroti::WindowsTestCaseModule
-  DL = Yamatanooroti::WindowsDefinition
-
-  private def setup_console(height, width)
-
-    r = DL.FreeConsole
-    error_message(r, 'FreeConsole')
-    r = DL.AllocConsole
-    error_message(r, 'AllocConsole')
-    @output_handle = DL.GetStdHandle(DL::STD_OUTPUT_HANDLE)
-
-    font = DL::CONSOLE_FONT_INFOEX.malloc
-    font.cbSize = DL::CONSOLE_FONT_INFOEX.size
-
-    r = DL.GetCurrentConsoleFontEx(@output_handle, 0, font)
-    error_message(r, 'GetCurrentConsoleFontEx')
-    fontsize = (font.dwFontSize & 0xffff0000) / 65536
-    fontwidth = font.dwFontSize & 0xffff
-    newsize = fontsize
-    newwidth = fontwidth
-
-    csbi = DL::CONSOLE_SCREEN_BUFFER_INFO.malloc
-    r = DL.GetConsoleScreenBufferInfo(@output_handle, csbi)
-    error_message(r, 'GetConsoleScreenBufferInfo')
-
-    if (width < (csbi.Right - csbi.Left + 1) / 4)
-      newsize = fontsize * (csbi.Right - csbi.Left + 1) / width
-      newwidth = fontwidth * (csbi.Right - csbi.Left + 1) / width
-    end
-    if newsize * height > fontsize * csbi.MaxHeight
-      newsize = fontsize * csbi.MaxHeight / height
-      newwidth = fontwidth * newsize / fontsize
-    end
-
-    font.dwFontSize = newsize * 65536 + newwidth
-    r = DL.SetCurrentConsoleFontEx(@output_handle, 0, font)
-    error_message(r, 'SetCurrentConsoleFontEx')
-
-    rect = DL::SMALL_RECT.malloc
-    rect.Left = 0
-    rect.Top = 0
-    rect.Right = width - 1
-    rect.Bottom = height - 1
-    r = DL.SetConsoleWindowInfo(@output_handle, 1, rect)
-    error_message(r, 'SetConsoleWindowInfo')
-
-#    size = DL.GetSystemMetrics(DL::SM_CYMIN) * 65536 + DL.GetSystemMetrics(DL::SM_CXMIN)
-#    r = DL.SetConsoleScreenBufferSize(@output_handle, size)
-#    error_message(r, 'SetConsoleScreenBufferSize')
-
-    csbi = DL::CONSOLE_SCREEN_BUFFER_INFO.malloc
-    r = DL.GetConsoleScreenBufferInfo(@output_handle, csbi)
-    error_message(r, 'GetConsoleScreenBufferInfo')
-
-    size = height * 65536 + width
-    r = DL.SetConsoleScreenBufferSize(@output_handle, size)
-    error_message(r, "SetConsoleScreenBufferSize " \
-      "(#{width} #{height}) " \
-      "(#{csbi.Right - csbi.Left + 1} #{csbi.Bottom - csbi.Top + 1}) " \
-      "(#{csbi.dwSize & 65535} #{csbi.dwSize / 65536}) " \
-      "(#{csbi.Left} #{csbi.Top}) " \
-      "(#{csbi.Right} #{csbi.Bottom})")
-    r = DL.ShowWindow(DL.GetConsoleWindow(), DL::SW_HIDE)
-    error_message(r, 'ShowWindow')
-  end
-
-  private def mb2wc(str)
-    size = DL.MultiByteToWideChar(65001, 0, str, str.bytesize, '', 0)
-    converted_str = String.new("\x00" * (size * 2), encoding: 'ASCII-8BIT')
-    DL.MultiByteToWideChar(65001, 0, str, str.bytesize, converted_str, size)
-    converted_str
-  end
-
-  private def wc2mb(str)
-    size = DL.WideCharToMultiByte(65001, 0, str, str.bytesize / 2, '', 0, 0, 0)
-    converted_str = "\x00" * size
-    DL.WideCharToMultiByte(65001, 0, str, str.bytesize / 2, converted_str, converted_str.bytesize, 0, 0)
-    converted_str
-  end
-
-  private def quote_command_arg(arg)
-    if not arg.match?(/[ \t"]/)
-      # No quotation needed.
-      return arg
-    end
-
-    if not arg.match?(/["\\]/)
-      # No embedded double quotes or backlashes, so I can just wrap quote
-      # marks around the whole thing.
-      return %{"#{arg}"}
-    end
-
-    quote_hit = true
-    result = +'"'
-    arg.chars.reverse.each do |c|
-      result << c
-      if quote_hit and c == '\\'
-        result << '\\'
-      elsif c == '"'
-        quote_hit = true
-        result << '\\'
-      else
-        quote_hit = false
-      end
-    end
-    result << '"'
-    result.reverse
-  end
-
-  private def launch(command)
-    command = "#{command}\0"
-    converted_command = mb2wc(command)
-    @pi = DL::PROCESS_INFORMATION.malloc
-    (@pi.to_ptr + 0)[0, DL::PROCESS_INFORMATION.size] = "\x00" * DL::PROCESS_INFORMATION.size
-    @startup_info_ex = DL::STARTUPINFOW.malloc
-    (@startup_info_ex.to_ptr + 0)[0, DL::STARTUPINFOW.size] = "\x00" * DL::STARTUPINFOW.size
-    r = DL.CreateProcessW(
-      Fiddle::NULL, converted_command,
-      Fiddle::NULL, Fiddle::NULL, 0, 0, Fiddle::NULL, Fiddle::NULL,
-      @startup_info_ex, @pi
-    )
-    error_message(r, 'CreateProcessW')
-    sleep @wait
-  rescue => e
-    pp e
-  end
-
-  private def error_message(r, method_name)
-    return if not r.zero?
-    err = DL.GetLastError
-    string = Fiddle::Pointer.malloc(Fiddle::SIZEOF_VOIDP)
-    DL.FormatMessage(
-      DL::FORMAT_MESSAGE_ALLOCATE_BUFFER | DL::FORMAT_MESSAGE_FROM_SYSTEM,
-      Fiddle::NULL,
-      err,
-      0x0,
-      string,
-      0,
-      Fiddle::NULL
-    )
-    log "ERROR(#{method_name}): #{err.to_s}: #{string.ptr.to_s}"
-    DL.LocalFree(string)
-  end
-
-  private def log(str)
-    puts str
-    open('aaa', 'a') do |fp|
-      fp.puts str
-    end
-  end
-
   def write(str)
-    sleep @wait
-    records = Fiddle::Pointer.malloc(DL::INPUT_RECORD_WITH_KEY_EVENT.size * str.size * 2, DL::FREE)
-    str.chars.each_with_index do |c, i|
-      c = "\r" if c == "\n"
-      byte = c.getbyte(0)
-      if c.bytesize == 1 and byte.allbits?(0x80) # with Meta key
-        c = (byte ^ 0x80).chr
-        control_key_state = DL::LEFT_ALT_PRESSED
-      else
-        control_key_state = 0
-      end
-      record_index = i * 2
-      r = DL::INPUT_RECORD_WITH_KEY_EVENT.new(records + DL::INPUT_RECORD_WITH_KEY_EVENT.size * record_index)
-      set_input_record(r, c, true, control_key_state)
-      record_index = i * 2 + 1
-      r = DL::INPUT_RECORD_WITH_KEY_EVENT.new(records + DL::INPUT_RECORD_WITH_KEY_EVENT.size * record_index)
-      set_input_record(r, c, false, control_key_state)
-    end
-    written_size = Fiddle::Pointer.malloc(Fiddle::SIZEOF_DWORD, DL::FREE)
-    r = DL.WriteConsoleInputW(DL.GetStdHandle(DL::STD_INPUT_HANDLE), records, str.size * 2, written_size)
-    error_message(r, 'WriteConsoleInput')
-  end
-
-  private def set_input_record(r, c, key_down, control_key_state)
-    begin
-      code = c.unpack('U').first
-    rescue ArgumentError
-      code = c.bytes.first
-    end
-    r.EventType = DL::KEY_EVENT
-    r.bKeyDown = key_down ? 1 : 0
-    r.wRepeatCount = 1
-    r.wVirtualKeyCode = DL.VkKeyScanW(code)
-    r.wVirtualScanCode = DL.MapVirtualKeyW(code, 0)
-    r.UnicodeChar = code
-    r.dwControlKeyState = control_key_state
-  end
-
-  private def free_resources
-    h_snap = DL.CreateToolhelp32Snapshot(DL::TH32CS_SNAPPROCESS, 0)
-    pe = DL::PROCESSENTRY32W.malloc
-    (pe.to_ptr + 0)[0, DL::PROCESSENTRY32W.size] = "\x00" * DL::PROCESSENTRY32W.size
-    pe.dwSize = DL::PROCESSENTRY32W.size
-    r = DL.Process32FirstW(h_snap, pe)
-    error_message(r, "Process32First")
-    process_table = {}
-    loop do
-      #log "a #{pe.th32ParentProcessID.inspect} -> #{pe.th32ProcessID.inspect} #{wc2mb(pe.szExeFile.pack('S260')).unpack('Z*').pack('Z*')}"
-      process_table[pe.th32ParentProcessID] ||= []
-      process_table[pe.th32ParentProcessID] << pe.th32ProcessID
-      break if DL.Process32NextW(h_snap, pe).zero?
-    end
-    process_table[DL.GetCurrentProcessId].each do |child_pid|
-      kill_process_tree(process_table, child_pid)
-    end
-    #r = DL.TerminateThread(@pi.hThread, 0)
-    #error_message(r, "TerminateThread")
-    #sleep @wait
-    r = DL.FreeConsole()
-    #error_message(r, "FreeConsole")
-    r = DL.AttachConsole(DL::ATTACH_PARENT_PROCESS)
-    error_message(r, 'AttachConsole')
-  end
-
-  private def kill_process_tree(process_table, pid)
-    process_table[pid]&.each do |child_pid|
-      kill_process_tree(process_table, child_pid)
-    end
-    h_proc = DL.OpenProcess(DL::PROCESS_ALL_ACCESS, 0, pid)
-    if (h_proc)
-      r = DL.TerminateProcess(h_proc, 0)
-      error_message(r, "TerminateProcess")
-      r = DL.CloseHandle(h_proc)
-      error_message(r, "CloseHandle")
-    end
+    @terminal.write(str)
   end
 
   def close
-    sleep 0.3
-    # read first before kill the console process including output
-    @result = retrieve_screen
-
-    free_resources
-  end
-
-  private def retrieve_screen
-    buffer_chars = @width * 8
-    buffer = Fiddle::Pointer.malloc(Fiddle::SIZEOF_SHORT * buffer_chars, DL::FREE)
-    n = Fiddle::Pointer[0]
-    lines = (0...@height).map do |y|
-      r = DL.ReadConsoleOutputCharacterW(@output_handle, buffer, @width, y << 16, -n)
-      error_message(r, "ReadConsoleOutputCharacterW")
-      r == 0 ? "" : wc2mb(buffer[0, n.to_i * 2]).gsub(/ *$/, "")
-    end
-    lines
+    @result = @terminal.close
   end
 
   def result
-    @result || retrieve_screen
+    @terminal.result
   end
 
-  def start_terminal(height, width, command, wait: 0.01, timeout: 2, startup_message: nil)
-    @timeout = timeout
-    @wait = wait
-    @result = nil
+  def codepage_success?
+    @terminal.codepage_success?
+  end
 
-    @height = height
-    @width = width
-    setup_console(height, width)
-    launch(command.map{ |c| quote_command_arg(c) }.join(' '))
+  def identify
+    @terminal.identify
+  end
+
+  def start_terminal(height, width, command, wait: nil, timeout: nil, startup_message: nil, codepage: nil)
+    @timeout = timeout || Yamatanooroti.options.default_timeout
+    @startup_timeout = @timeout + 2
+    @wait = wait || Yamatanooroti.options.default_wait
+    @result = nil
+    if @terminal
+      if !Yamatanooroti.options.show_console || Yamatanooroti.options.close_console != :never
+        @terminal.close_console
+      end
+    end
+    if Yamatanooroti.options.conhost
+      @terminal = Yamatanooroti::ConhostTerm.setup_console(height, width, @wait, @timeout, local_name)
+    else
+      @terminal = Yamatanooroti::WindowsTerminalTerm.setup_console(height, width, @wait, @timeout, local_name)
+    end
+    @terminal.setup_cp(codepage) if codepage
+    @terminal.launch(command)
 
     case startup_message
     when String
-      wait_startup_message { |message| message.start_with?(startup_message) }
+      wait_startup_message { |message| message.start_with?(startup_message.chars.each_slice(width).map { |l| l.join.rstrip }.join("\n")) }
     when Regexp
       wait_startup_message { |message| startup_message.match?(message) }
     end
   end
 
   private def wait_startup_message
-    wait_until = Time.now + @timeout
+    wait_until = Time.now + @startup_timeout
+    chunks = +''
     loop do
       wait = wait_until - Time.now
       if wait.negative?
         raise "Startup message didn't arrive within timeout: #{chunks.inspect}"
       end
 
-      break if yield retrieve_screen.join("\n").sub(/\n*\z/, "\n")
+      chunks = @terminal.retrieve_screen.join("\n").sub(/\n*\z/, "\n")
+      break if yield chunks
       sleep @wait
     end
   end
 
   private def retryable_screen_assertion_with_proc(check_proc, assert_proc, convert_proc = :itself.to_proc)
     retry_until = Time.now + @timeout
-    while Time.now < retry_until
-      break if @result
-
-      break if check_proc.call(convert_proc.call(retrieve_screen))
-      sleep @wait
+    screen = if @result
+      convert_proc.call(@result)
+    else
+      loop do
+        screen = convert_proc.call(@terminal.retrieve_screen)
+        break screen if Time.now >= retry_until
+        break screen if check_proc.call(screen)
+        sleep @wait
+      end
     end
-    assert_proc.call(convert_proc.call(@result || retrieve_screen))
+    @terminal.clear_need_wait_flag
+    assert_proc.call(screen)
   end
 
   def assert_screen(expected_lines, message = nil)
@@ -538,6 +103,18 @@ module Yamatanooroti::WindowsTestCaseModule
         ->(actual) { assert_match(expected_lines, actual, message) },
         lines_to_string
       )
+    end
+  end
+
+  def self.included(cls)
+    cls.instance_exec do
+      teardown do
+        @terminal&.close_console(
+          !Yamatanooroti.options.show_console ||
+           Yamatanooroti.options.close_console == :always || 
+           Yamatanooroti.options.close_console == :pass && passed?
+        )
+      end
     end
   end
 end
