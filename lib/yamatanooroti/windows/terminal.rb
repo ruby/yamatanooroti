@@ -36,7 +36,7 @@ class Yamatanooroti::WindowsTerminalTerm
   end
 
   def console_process_id
-    @wt.active_tab.pid
+    @wt.active_tab&.pid
   end
 
   def get_size
@@ -83,11 +83,11 @@ class Yamatanooroti::WindowsTerminalTerm
     Self.max_size = [[max_size[0], 60].min, [max_size[1], 200].min]
     puts max_size.then { |r, c| "Windows Terminal maximum size: rows: #{r}, columns: #{c}" }
     wt.close!
-    wt = self.new(2, 2, 0.01, 5.0)
-    min_size = wt.get_size
-    Self.min_size = min_size
-    puts min_size.then { |r, c| "Windows Terminal smallest size: rows: #{r}, columns: #{c}" }
-    wt.close!
+    #wt = self.new(2, 2, 0.01, 5.0)
+    #min_size = wt.get_size
+    #Self.min_size = min_size
+    #puts min_size.then { |r, c| "Windows Terminal smallest size: rows: #{r}, columns: #{c}" }
+    #wt.close!
     puts Self.max_size.then {|r, c|  "Use test window size: rows: #{r}, columns: #{c}" }
   end
 
