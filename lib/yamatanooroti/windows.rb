@@ -1,5 +1,6 @@
 require 'test/unit'
 require_relative 'windows/windows-definition'
+require_relative 'windows/windows-setup'
 require_relative 'windows/windows'
 require_relative 'windows/conhost'
 require_relative 'windows/terminal'
@@ -27,6 +28,7 @@ module Yamatanooroti::WindowsTestCaseModule
 
   def start_terminal(height, width, command, wait: nil, timeout: nil, startup_message: nil, codepage: nil)
     @timeout = timeout || Yamatanooroti.options.default_timeout
+    @startup_timeout = @timeout + 2
     @wait = wait || Yamatanooroti.options.default_wait
     @result = nil
     if @terminal
@@ -51,7 +53,7 @@ module Yamatanooroti::WindowsTestCaseModule
   end
 
   private def wait_startup_message
-    wait_until = Time.now + @timeout
+    wait_until = Time.now + @startup_timeout
     chunks = +''
     loop do
       wait = wait_until - Time.now

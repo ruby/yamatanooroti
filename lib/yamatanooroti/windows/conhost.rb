@@ -5,6 +5,8 @@ class Yamatanooroti::ConhostTerm
     new(height, width, wait, timeout, name)
   end
 
+  attr_reader :console_process_id
+
   def initialize(height, width, wait, timeout, name)
     @wait = wait
     @timeout = timeout
@@ -13,7 +15,7 @@ class Yamatanooroti::ConhostTerm
     @codepage_success_p = nil
     @wrote_and_not_yet_waited = false
 
-    @console_process_id = DL.create_console(CONSOLE_KEEPING_COMMAND.sub("NAME", name), show_console_param())
+    @console_process_id = DL.create_console(keeper_commandline(name), show_console_param())
 
     sleep 0.1 if Yamatanooroti.options.windows == :"legacy-conhost" # ad-hoc
 
@@ -39,5 +41,9 @@ class Yamatanooroti::ConhostTerm
         @console_process_id = nil
       end
     end
+  end
+
+  def close!
+    close_console(!Yamatanooroti.options.show_console)
   end
 end
