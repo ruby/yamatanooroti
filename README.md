@@ -15,14 +15,11 @@ You can test the executed result and its rendering on the automatically detected
 require 'yamatanooroti'
 
 class MyTest < Yamatanooroti::TestCase
-  def setup
-    start_terminal(5, 30, ['irb', '-f', '--multiline'])
-  end
-
   def test_example
+    start_terminal(5, 30, ['irb', '-f', '--multiline'])
     write(":a\n")
-    close
     assert_screen(['irb(main):001:0> :a', '=> :a', 'irb(main):002:0>', '', ''])
+    close
   end
 end
 ```
@@ -65,14 +62,11 @@ If you want to specify vterm environment that needs vterm gem, you can use `Yama
 require 'yamatanooroti'
 
 class MyTest < Yamatanooroti::VTermTestCase
-  def setup
-    start_terminal(5, 30, ['irb', '-f', '--multiline'])
-  end
-
   def test_example
+    start_terminal(5, 30, ['irb', '-f', '--multiline'])
     write(":a\n")
-    close
     assert_screen(['irb(main):001:0> :a', '=> :a', 'irb(main):002:0>', '', ''])
+    close
   end
 end
 ```
@@ -90,15 +84,15 @@ Starts terminal internally that is sized `height` and `width` with `command` to 
 If `startup_message` is given, `start_terminal` waits for the string to be printed and then returns.
 
 ```ruby
-code = 'sleep 1; puts "aaa"; sleep 10; puts "bbb"'
-start_terminal(5, 30, ['ruby', '-e', code], startup_message: 'aaa')
-close
+code = 'sleep 1; print "prompt>"; s = gets; sleep 1; puts s.upcase'
+start_terminal(5, 30, ['ruby', '-e', code], startup_message: 'prompt>')
+# Screen is already "prompt>"
+write "hello\n"
 assert_screen(<<~EOC)
-  aaa
+  prompt>hello
+  HELLO
 EOC
-# The start_terminal method waits for the output of the "aaa" as specified by
-# the startup_message option, the "bbb" after 10 seconds won't come because
-# the I/O is closed immediately after it.
+close
 ```
 
 ### `write(str)`
