@@ -3,5 +3,10 @@
 loop {
   print 'prompt> '
   result = gets
+  result.force_encoding('locale').encode!(Encoding.default_external) unless result.valid_encoding?
   puts "=> #{eval(result).inspect}"
 }
+
+# On older windows ruby versions(< 3.1 ?), STDIN.gets returns locale code bytes with default external encoding. https://bugs.ruby-lang.org/issues/18353
+# Not same versions(< 3.2 ?), STDIN.gets returns invalid bytes if input with leading DBCS characters. https://bugs.ruby-lang.org/issues/18588
+# Because of this, input key stroke must start with SBCS character to support older ruby versions.
